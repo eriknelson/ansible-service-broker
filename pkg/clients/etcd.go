@@ -14,7 +14,7 @@ type EtcdConfig struct {
 	EtcdPort string `yaml:"etcd_port"`
 }
 
-func NewEtcd(config EtcdConfig, log *logging.Logger) error {
+func Etcd(config EtcdConfig, log *logging.Logger) (client.Client, error) {
 	// TODO: Config validation
 	endpoints := []string{etcdEndpoint(config.EtcdHost, config.EtcdPort)}
 
@@ -29,11 +29,10 @@ func NewEtcd(config EtcdConfig, log *logging.Logger) error {
 		HeaderTimeoutPerRequest: time.Second,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	Clients.EtcdClient = etcdClient
-	return nil
+	return etcdClient, nil
 }
 
 func etcdEndpoint(host string, port string) string {
