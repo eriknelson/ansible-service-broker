@@ -54,7 +54,7 @@ type Client struct {
 }
 
 func NewClient(log *logging.Logger) (*Client, error) {
-	dockerClient, err := docker.NewClient(DockerSocket)
+	dockerClient, err := clients.Docker(log)
 	if err != nil {
 		log.Error("Could not load docker client")
 		return nil, err
