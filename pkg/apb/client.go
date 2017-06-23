@@ -54,23 +54,15 @@ type Client struct {
 }
 
 func NewClient(log *logging.Logger) (*Client, error) {
-	dockerClient, err := clients.Docker(log)
-	if err != nil {
-		log.Error("Could not load docker client")
-		return nil, err
-	}
-
-	k8s, err := clients.Kubernetes(log)
-	if err != nil {
-		return nil, err
-	}
-
-	rest := k8s.CoreV1().RESTClient()
+	//TODO: This object gets created each provision, bind, deprovision,
+	// and unbind.  Instead, those functions should be using the global
+	// clients were needed and this class needs to be reworked.
+	k8s := clients.Clients.KubernetesClient
 
 	client := &Client{
-		dockerClient:  dockerClient,
+		dockerClient:  clients.Clients.DockerClient,
 		ClusterClient: k8s,
-		RESTClient:    rest,
+		RESTClient:    k8s.CoreV1().RESTClient(),
 		log:           log,
 	}
 
