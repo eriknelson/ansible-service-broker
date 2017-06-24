@@ -5,13 +5,32 @@ import (
 	logging "github.com/op/go-logging"
 )
 
-func NewDocker(log *logging.Logger) error {
-	dockerClient, err := docker.NewClient(DockerSocket)
+type dockerClientResult struct {
+	client *docker.Client
+	err    error
+}
+
+func Docker(log *logging.Logger) (*docker.Client, error) {
+	once.Docker.Do(func() {
+		client, err := newDocker(log)
+		if err != nil {
+			log.Error("An error occurred while initializing Docker client:")
+			log.Error(err.Error())
+			instances.Docker = dockerClientResult{nil, err}
+		}
+		instances.Docker = dockerClientResult{client, nil}
+	})
+
+	err := instances.Docker.err
 	if err != nil {
-		log.Error("Could not load docker client")
-		return err
+		log.Error("Something went wrong initializing Docker!")
+		log.Error(err.Error())
+		return nil, err
 	}
 
-	Clients.DockerClient = dockerClient
-	return nil
+	return instances.Docker.client, nil
+}
+
+func newDocker(log *logging.Logger) (*docker.Client, error) {
+	return docker.NewClient(DockerSocket)
 }

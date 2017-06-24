@@ -17,18 +17,14 @@ func Unbind(
 	log.Notice("                       UNBINDING                              ")
 	log.Notice("============================================================")
 
-	var client *Client
-	var err error
-
-	if client, err = NewClient(log); err != nil {
-		return err
-	}
-
-	output, err := client.RunImage("unbind", clusterConfig, instance.Spec, instance.Context, instance.Parameters)
-	log.Debugf("Output from unbind call to APB: %s", string(output))
+	// podName, err
+	_, err := ExecuteApb(
+		"unbind", clusterConfig, instance.Spec,
+		instance.Context, instance.Parameters, log,
+	)
 
 	if err != nil {
-		log.Error("Problem running image", err)
+		log.Error("Problem executing APB unbind", err)
 	}
 
 	return err
