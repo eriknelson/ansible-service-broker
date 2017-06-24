@@ -14,20 +14,15 @@ type EtcdConfig struct {
 	EtcdPort string `yaml:"etcd_port"`
 }
 
-type etcdClientResult struct {
-	client *etcd.Client
-	err    error
-}
-
 func Etcd(config EtcdConfig, log *logging.Logger) (*etcd.Client, error) {
 	once.Etcd.Do(func() {
 		client, err := newEtcd(config, log)
 		if err != nil {
 			log.Error("An error occurred while initializing Etcd client:")
 			log.Error(err.Error())
-			instances.Etcd = etcdClientResult{nil, err}
+			instances.Etcd = clientResult{nil, err}
 		}
-		instances.Etcd = etcdClientResult{client, nil}
+		instances.Etcd = clientResult{client, nil}
 	})
 
 	err := instances.Etcd.err

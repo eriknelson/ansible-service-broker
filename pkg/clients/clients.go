@@ -4,10 +4,15 @@ import (
 	"sync"
 )
 
+type clientResult struct {
+	client interface{}
+	err    error
+}
+
 var instances struct {
-	Etcd       etcdClientResult
-	Kubernetes kubernetesClientResult
-	Docker     dockerClientResult
+	Etcd       clientResult
+	Kubernetes clientResult
+	Docker     clientResult
 }
 
 var once struct {
