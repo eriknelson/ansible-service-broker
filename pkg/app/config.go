@@ -8,12 +8,12 @@ import (
 
 	"github.com/openshift/ansible-service-broker/pkg/apb"
 	"github.com/openshift/ansible-service-broker/pkg/broker"
-	"github.com/openshift/ansible-service-broker/pkg/clients"
+	"github.com/openshift/ansible-service-broker/pkg/dao"
 )
 
 type Config struct {
 	Registry   apb.RegistryConfig
-	Dao        clients.EtcdConfig
+	Dao        dao.DaoConfig
 	Log        LogConfig
 	Openshift  apb.ClusterConfig
 	ConfigFile string

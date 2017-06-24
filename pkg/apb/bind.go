@@ -25,17 +25,13 @@ func Bind(
 	log.Notice(fmt.Sprintf("ServiceInstance.Description: %s", instance.Spec.Description))
 	log.Notice("============================================================")
 
-	var client *Client
-	var err error
-
-	if client, err = NewClient(log); err != nil {
-		return "", nil, err
-	}
-
-	podName, err := client.RunImage("bind", clusterConfig, instance.Spec, instance.Context, parameters)
+	podName, err := ExecuteApb(
+		"bind", clusterConfig, instance.Spec,
+		instance.Context, parameters, log,
+	)
 
 	if err != nil {
-		log.Error("Problem running image", err)
+		log.Error("Problem executing apb: %s", err)
 		return podName, nil, err
 	}
 
