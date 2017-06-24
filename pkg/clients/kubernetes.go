@@ -9,20 +9,15 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
-type kubernetesClientResult struct {
-	client *clientset.Clientset
-	err    error
-}
-
 func Kubernetes(log *logging.Logger) (*clientset.Clientset, error) {
 	once.Kubernetes.Do(func() {
 		client, err := newKubernetes(log)
 		if err != nil {
 			log.Error("An error occurred while initializing Kubernetes client:")
 			log.Error(err.Error())
-			instances.Kubernetes = kubernetesClientResult{nil, err}
+			instances.Kubernetes = clientResult{nil, err}
 		}
-		instances.Kubernetes = kubernetesClientResult{client, nil}
+		instances.Kubernetes = clientResult{client, nil}
 	})
 
 	err := instances.Etcd.err
