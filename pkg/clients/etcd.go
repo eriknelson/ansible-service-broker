@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,10 +16,11 @@ type EtcdConfig struct {
 }
 
 func Etcd(config EtcdConfig, log *logging.Logger) (*etcd.Client, error) {
+	errMsg := "Something went wrong intializing etcd client!"
 	once.Etcd.Do(func() {
 		client, err := newEtcd(config, log)
 		if err != nil {
-			log.Error("An error occurred while initializing Etcd client:")
+			log.Error(errMsg)
 			log.Error(err.Error())
 			instances.Etcd = clientResult{nil, err}
 		}
@@ -27,12 +29,16 @@ func Etcd(config EtcdConfig, log *logging.Logger) (*etcd.Client, error) {
 
 	err := instances.Etcd.err
 	if err != nil {
-		log.Error("Something went wrong initializing Etcd!")
+		log.Error(errMsg)
 		log.Error(err.Error())
 		return nil, err
 	}
 
-	return instances.Etcd.client, nil
+	if client, ok := instances.Etcd.client.(*etcd.Client); ok {
+		return client, nil
+	} else {
+		return nil, errors.New(errMsg)
+	}
 }
 
 func newEtcd(config EtcdConfig, log *logging.Logger) (*etcd.Client, error) {

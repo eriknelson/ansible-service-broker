@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"errors"
 	logging "github.com/op/go-logging"
 	restclient "k8s.io/client-go/rest"
 
@@ -10,24 +11,29 @@ import (
 )
 
 func Kubernetes(log *logging.Logger) (*clientset.Clientset, error) {
+	errMsg := "Something went wrong while initializing kubernetes client!"
 	once.Kubernetes.Do(func() {
 		client, err := newKubernetes(log)
 		if err != nil {
-			log.Error("An error occurred while initializing Kubernetes client:")
+			log.Error(errMsg)
 			log.Error(err.Error())
 			instances.Kubernetes = clientResult{nil, err}
 		}
 		instances.Kubernetes = clientResult{client, nil}
 	})
 
-	err := instances.Etcd.err
+	err := instances.Kubernetes.err
 	if err != nil {
-		log.Error("Something went wrong initializing Kubernetes!")
+		log.Error(errMsg)
 		log.Error(err.Error())
 		return nil, err
 	}
 
-	return instances.Kubernetes.client, nil
+	if client, ok := instances.Kubernetes.client.(*clientset.Clientset); ok {
+		return client, nil
+	} else {
+		return nil, errors.New(errMsg)
+	}
 }
 
 func createClientConfigFromFile(configPath string) (*restclient.Config, error) {
