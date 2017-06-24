@@ -13,28 +13,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-/*
-parameters will be 2 keys
-
-answers {}
-kubecfg {}
-
-deprovision - delete the namespace and it tears the whole thing down.
-
-oc delete?
-
-
-route will be hardcoded, need to determine how to get that from the apb.
-
-
-need to pass in cert through parameters
-
-
-First cut might have to pass kubecfg from broker. FIRST SPRINT broker passes username and password.
-
-admin/admin
-*/
-
 type ClusterConfig struct {
 	InCluster bool
 	Target    string
@@ -50,9 +28,6 @@ func ExecuteApb(
 	p *Parameters,
 	log *logging.Logger,
 ) (string, error) {
-	// HACK: We're expecting to run containers via go APIs rather than cli cmds
-	// TODO: Expecting parameters to be passed here in the future as well
-
 	extraVars, err := createExtraVars(context, p)
 
 	if err != nil {
