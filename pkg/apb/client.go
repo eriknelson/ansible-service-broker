@@ -4,17 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
-	docker "github.com/fsouza/go-dockerclient"
-	logging "github.com/op/go-logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	restclient "k8s.io/client-go/rest"
 
+	logging "github.com/op/go-logging"
 	"github.com/openshift/ansible-service-broker/pkg/clients"
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 /*
@@ -46,35 +42,13 @@ type ClusterConfig struct {
 	Password  string `yaml:"pass"`
 }
 
-type Client struct {
-	dockerClient  *docker.Client
-	ClusterClient *clientset.Clientset
-	RESTClient    restclient.Interface
-	log           *logging.Logger
-}
-
-func NewClient(log *logging.Logger) (*Client, error) {
-	//TODO: This object gets created each provision, bind, deprovision,
-	// and unbind.  Instead, those functions should be using the global
-	// clients were needed and this class needs to be reworked.
-	k8s := clients.Clients.KubernetesClient
-
-	client := &Client{
-		dockerClient:  clients.Clients.DockerClient,
-		ClusterClient: k8s,
-		RESTClient:    k8s.CoreV1().RESTClient(),
-		log:           log,
-	}
-
-	return client, nil
-}
-
-func (c *Client) RunImage(
+func ExecuteApb(
 	action string,
 	clusterConfig ClusterConfig,
 	spec *Spec,
 	context *Context,
 	p *Parameters,
+	log *logging.Logger,
 ) (string, error) {
 	// HACK: We're expecting to run containers via go APIs rather than cli cmds
 	// TODO: Expecting parameters to be passed here in the future as well
@@ -85,14 +59,14 @@ func (c *Client) RunImage(
 		return "", err
 	}
 
-	c.log.Debug("clusterConfig:")
+	log.Debug("clusterConfig:")
 	if !clusterConfig.InCluster {
-		c.log.Debug("target: [ %s ]", clusterConfig.Target)
-		c.log.Debug("user: [ %s ]", clusterConfig.User)
+		log.Debug("target: [ %s ]", clusterConfig.Target)
+		log.Debug("user: [ %s ]", clusterConfig.User)
 	}
-	c.log.Debug("name:[ %s ]", spec.Name)
-	c.log.Debug("image:[ %s ]", spec.Image)
-	c.log.Debug("action:[ %s ]", action)
+	log.Debug("name:[ %s ]", spec.Name)
+	log.Debug("image:[ %s ]", spec.Image)
+	log.Debug("action:[ %s ]", action)
 
 	// It's a critical error if a Namespace is not provided to the
 	// broker because its required to know where to execute the pods and
@@ -100,18 +74,18 @@ func (c *Client) RunImage(
 	// with controlled error handling.
 	if context.Namespace == "" {
 		errStr := "Namespace not found within request context. Cannot perform requested " + action
-		c.log.Error(errStr)
+		log.Error(errStr)
 		return "", errors.New(errStr)
 	}
 
 	ns := context.Namespace
 	apbId := fmt.Sprintf("apb-%s", uuid.New())
 
-	sam := NewServiceAccountManager(c.log)
+	sam := NewServiceAccountManager(log)
 	serviceAccountName, err := sam.CreateApbSandbox(ns, apbId)
 
 	if err != nil {
-		c.log.Error(err.Error())
+		log.Error(err.Error())
 		return apbId, err
 	}
 
@@ -137,36 +111,13 @@ func (c *Client) RunImage(
 		},
 	}
 
-	c.log.Notice(fmt.Sprintf("Creating pod %q in the %s namespace", pod.Name, ns))
-	_, err = clients.Clients.KubernetesClient.CoreV1().Pods(ns).Create(pod)
-
-	return apbId, err
-}
-
-func (c *Client) PullImage(imageName string) error {
-	// Under what circumstances does this error out?
-	clients.Clients.DockerClient.PullImage(docker.PullImageOptions{
-		Repository:   imageName,
-		OutputStream: os.Stdout,
-	}, docker.AuthConfiguration{})
-	return nil
-}
-
-// TODO(fabianvf): This function is also called from broker/broker.go
-// We should probably move this logic out of the client to a more
-// generic location.
-func OcLogin(log *logging.Logger, args ...string) error {
-	log.Debug("Logging into openshift...")
-
-	fullArgs := append([]string{"login"}, args...)
-
-	output, err := RunCommand("oc", fullArgs...)
-
+	log.Notice(fmt.Sprintf("Creating pod %q in the %s namespace", pod.Name, ns))
+	k8scli, err := clients.Kubernetes(log)
 	if err != nil {
-		log.Debug(string(output))
-		return err
+		return apbId, err
 	}
-	return nil
+	_, err = k8scli.CoreV1().Pods(ns).Create(pod)
+	return apbId, err
 }
 
 // TODO: Instead of putting namespace directly as a parameter, we should create a dictionary
