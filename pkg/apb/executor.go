@@ -34,11 +34,7 @@ func ExecuteApb(
 		return "", err
 	}
 
-	log.Debug("clusterConfig:")
-	if !clusterConfig.InCluster {
-		log.Debug("target: [ %s ]", clusterConfig.Target)
-		log.Debug("user: [ %s ]", clusterConfig.User)
-	}
+	log.Debug("ExecutingApb:")
 	log.Debug("name:[ %s ]", spec.Name)
 	log.Debug("image:[ %s ]", spec.Image)
 	log.Debug("action:[ %s ]", action)
