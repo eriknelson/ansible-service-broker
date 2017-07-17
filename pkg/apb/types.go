@@ -77,7 +77,8 @@ const (
 
 	// NOTE: Applied to APB ServiceAccount via RoleBinding, not ClusterRoleBinding
 	// cluster-admin scoped to the project the apb is operating in
-	ApbRole = "cluster-admin"
+	//ApbRole = "cluster-admin"
+	ApbRole = "admin"
 )
 
 func specLogDump(spec *Spec, log *logging.Logger) {
