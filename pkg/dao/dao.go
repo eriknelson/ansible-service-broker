@@ -261,6 +261,8 @@ func (d *Dao) GetExtractedCredentials(id string) (*apb.ExtractedCredentials, err
 	if err := d.getObject(extractedCredentialsKey(id), extractedCredentials); err != nil {
 		return nil, err
 	}
+	d.log.Notice("NSK: extractedCredentials ->")
+	d.log.Noticef("%+v", extractedCredentials)
 	return extractedCredentials, nil
 }
 
@@ -294,12 +296,20 @@ func (d *Dao) getObject(key string, data interface{}) error {
 	if err != nil {
 		return err
 	}
+
+	d.log.Noticef("NSK: Raw getObject: [%s]", key)
+	d.log.Notice(raw)
+
 	apb.LoadJSON(raw, data)
 	return nil
 }
 
 func (d *Dao) setObject(key string, data interface{}) error {
 	payload, err := apb.DumpJSON(data)
+
+	d.log.Noticef("NSK: Raw setObject: [%s]", key)
+	d.log.Notice(payload)
+
 	if err != nil {
 		return err
 	}

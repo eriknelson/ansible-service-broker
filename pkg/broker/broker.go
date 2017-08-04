@@ -761,8 +761,16 @@ func (a AnsibleBroker) Bind(instanceUUID uuid.UUID, bindingUUID uuid.UUID, req *
 			a.log.Errorf("Could not persist extracted credentials - %v", err)
 			return nil, err
 		}
+
+		a.log.Notice("NSK: Took bindExtCreds branch ->")
+		a.log.Noticef("%+v", bindExtCreds.Credentials)
+
 		return &BindResponse{Credentials: bindExtCreds.Credentials}, nil
 	}
+
+	a.log.Notice("NSK: Took provExtCreds branch ->")
+	a.log.Noticef("%+v", provExtCreds.Credentials)
+
 	return &BindResponse{Credentials: provExtCreds.Credentials}, nil
 }
 

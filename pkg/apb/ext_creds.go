@@ -20,6 +20,8 @@ func ExtractCredentials(
 ) (*ExtractedCredentials, error) {
 	log.Debug("Calling monitorOutput on " + podname)
 	bindOutput, err := monitorOutput(namespace, podname, log)
+	log.Notice("NSK bindoutput:")
+	log.Noticef("%s", bindOutput)
 	if bindOutput == nil {
 		return nil, nil
 	}
@@ -27,7 +29,10 @@ func ExtractCredentials(
 		return nil, err
 	}
 
-	return buildExtractedCredentials(bindOutput)
+	_creds, err := buildExtractedCredentials(bindOutput)
+	log.Debug("NSK: ext_creds")
+	log.Debugf("%+v", _creds)
+	return _creds, err
 }
 
 func monitorOutput(namespace string, podname string, log *logging.Logger) ([]byte, error) {
