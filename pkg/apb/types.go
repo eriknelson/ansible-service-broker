@@ -44,6 +44,7 @@ type ParameterDescriptor struct {
 	Pattern      string      `json:"pattern,omitempty"`
 	Enum         []string    `json:"enum,omitempty"`
 	Required     bool        `json:"required"`
+	Updatable    bool        `json:"updatable"`
 	DisplayType  string      `json:"display_type,omitempty" yaml:"display_type,omitempty"`
 	DisplayGroup string      `json:"display_group,omitempty" yaml:"display_group,omitempty"`
 }
@@ -58,6 +59,7 @@ type Plan struct {
 	Bindable       bool                   `json:"bindable,omitempty"`
 	Parameters     []ParameterDescriptor  `json:"parameters"`
 	BindParameters []ParameterDescriptor  `json:"bind_parameters,omitempty" yaml:"bind_parameters,omitempty"`
+	UpdatesTo      []string               `json:"updates_to,omitempty" yaml:"updates_to,omitempty"`
 }
 
 // Spec - A APB spec
