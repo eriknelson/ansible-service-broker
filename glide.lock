@@ -1,5 +1,5 @@
-hash: f2acb4a4961bc773a16da81a4063907651f189d33a7f5c04b271f60aba93697e
-updated: 2017-11-14T19:07:37.811514335-05:00
+hash: 3c3d02e680419e9ae9a40900ce9eb49b1704171772af6223be703d91489e58e1
+updated: 2017-11-22T11:24:51.342854824-05:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -8,7 +8,7 @@ imports:
   subpackages:
   - quantile
 - name: github.com/coreos/etcd
-  version: f1d7dd87da3e8feab4aaf675b8e29c6a5ed5f58b
+  version: 694728c496e22dfa5719c78ff23cc982e15bcb2f
   subpackages:
   - auth/authpb
   - client
@@ -50,6 +50,10 @@ imports:
   - api/types/mount
 - name: github.com/docker/go-connections
   version: 7da10c8c50cad14494ec818dcdfb6506265c0086
+- name: github.com/docker/spdystream
+  version: 449fdfce4d962303d702fec724ef0ad181c92528
+  subpackages:
+  - spdy
 - name: github.com/elazarl/go-bindata-assetfs
   version: 3dcc96556217539f50599357fb481ac0dc7439b9
 - name: github.com/emicklei/go-restful
@@ -88,6 +92,7 @@ imports:
   version: 4bd1920723d7b7c925de087aa32e2187708897f7
   subpackages:
   - proto
+  - protoc-gen-go/descriptor
   - ptypes
   - ptypes/any
   - ptypes/duration
@@ -183,17 +188,6 @@ imports:
 - name: golang.org/x/crypto
   version: d172538b2cfce0c13cee31e647d0367aa8cd2486
   subpackages:
-  - bcrypt
-  - blowfish
-  - curve25519
-  - ed25519
-  - ed25519/internal/edwards25519
-  - nacl/secretbox
-  - pkcs12
-  - pkcs12/internal/rc2
-  - poly1305
-  - salsa20/salsa
-  - ssh
   - ssh/terminal
 - name: golang.org/x/net
   version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
@@ -212,7 +206,6 @@ imports:
   version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
   subpackages:
   - unix
-  - windows
 - name: golang.org/x/text
   version: 2910a502d2bf9e43193af9d68ca516529614eed3
   subpackages:
@@ -226,16 +219,34 @@ imports:
   - unicode/bidi
   - unicode/norm
   - width
-- name: google.golang.org/grpc
-  version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
+- name: google.golang.org/genproto
+  version: 09f6ed296fc66555a25fe4ce95173148778dfa85
   subpackages:
+  - googleapis/api/annotations
+  - googleapis/rpc/status
+- name: google.golang.org/grpc
+  version: 5a9f7b402fe85096d2e1d0383435ee1876e863d0
+  subpackages:
+  - balancer
+  - balancer/roundrobin
   - codes
+  - connectivity
   - credentials
+  - encoding
+  - grpclb/grpc_lb_v1/messages
   - grpclog
+  - health/grpc_health_v1
   - internal
+  - keepalive
   - metadata
   - naming
   - peer
+  - resolver
+  - resolver/dns
+  - resolver/passthrough
+  - stats
+  - status
+  - tap
   - transport
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
@@ -244,7 +255,7 @@ imports:
 - name: gopkg.in/yaml.v1
   version: 9f9df34309c04878acc86042b16630b0f696e1de
 - name: gopkg.in/yaml.v2
-  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
+  version: 287cf08546ab5e7e37d55a84f7ed3fd1db036de5
 - name: k8s.io/apimachinery
   version: abe34e4f5b4413c282a83011892cbeea5b32223b
   subpackages:
@@ -284,11 +295,13 @@ imports:
   - pkg/util/errors
   - pkg/util/framer
   - pkg/util/httpstream
+  - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
   - pkg/util/mergepatch
   - pkg/util/net
   - pkg/util/rand
+  - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
   - pkg/util/strategicpatch
@@ -495,8 +508,10 @@ imports:
   - tools/clientcmd/api/latest
   - tools/clientcmd/api/v1
   - tools/metrics
+  - tools/remotecommand
   - transport
   - util/cert
+  - util/exec
   - util/flowcontrol
   - util/homedir
   - util/integer

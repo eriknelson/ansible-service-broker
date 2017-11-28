@@ -30,25 +30,29 @@ import:
   version: v0.11.4
 - package: github.com/docker/go-connections
   version: 7da10c8c50cad14494ec818dcdfb6506265c0086
-
-# copied compatible versions from service-catalog glide.yaml
 - package: k8s.io/kubernetes
-  version: ebb8d6e0fadfc95f3d64ccecc36c8ed2ac9224ef # client-go origin version
+  version: ebb8d6e0fadfc95f3d64ccecc36c8ed2ac9224ef
 - package: k8s.io/client-go
-  version: e356aa2e77ab4a5914c216c12ba14cce25a25ab0 # in sync with kubernetes 1.7.0
+  version: e356aa2e77ab4a5914c216c12ba14cce25a25ab0
 - package: k8s.io/apimachinery
-  version: abe34e4f5b4413c282a83011892cbeea5b32223b # wanted by client-go; release-1.7 branch
+  version: abe34e4f5b4413c282a83011892cbeea5b32223b
 - package: k8s.io/apiserver
-  version: ab57ed5a72c3b67058f665d660e23bae18339fc2 # June 23, similar to client-go. No 1.7 branch yet BUT this version is perfectly compatible it seems
+  version: ab57ed5a72c3b67058f665d660e23bae18339fc2
 - package: github.com/onsi/gomega
-  version: d59fa0ac68bb5dd932ee8d24eed631cdd519efc3 # wanted by k8s.io/kubernetes
+  version: d59fa0ac68bb5dd932ee8d24eed631cdd519efc3
 - package: github.com/onsi/ginkgo
-  version: 67b9df7f55fe1165fd9ad49aca7754cce01a42b8 # wanted by k8s.io/kubernetes
+  version: 67b9df7f55fe1165fd9ad49aca7754cce01a42b8
 - package: github.com/emicklei/go-restful
-  version: ff4f55a206334ef123e4f79bbf348980da81ca46 # not a direct dep, but forces the version for k8s/apiserver
+  version: ff4f55a206334ef123e4f79bbf348980da81ca46
   subpackages:
   - swagger
 - package: gopkg.in/natefinch/lumberjack.v2
   version: 20b71e5b60d756d3d2f80def009790325acc2b23
 - package: github.com/exponent-io/jsonpath
   version: d6023ce2651d8eafb5c75bb0c7167536102ec9f5
+- package: google.golang.org/grpc
+  version: ^1.8.0
+  subpackages:
+  - status
+  - keepalive
+- package: github.com/docker/spdystream
