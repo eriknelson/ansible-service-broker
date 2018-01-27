@@ -47,7 +47,7 @@ var (
 	// binding
 	ErrorBindingExists = errors.New("binding exists")
 	// ErrorProvisionInProgress - Error for when provision is called on a service instance that has a provision job in progress
-	ErrorProvisionInProgress = errors.New("provision in progress")
+	ErrorProvisionInProgress = errors.New("provisiot in progress")
 	// ErrorDeprovisionInProgress - Error for when deprovision is called on a service instance that has a deprovision job in progress
 	ErrorDeprovisionInProgress = errors.New("deprovision in progress")
 	// ErrorUpdateInProgress - Error for when update is called on a service instance that has an update job in progress

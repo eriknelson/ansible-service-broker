@@ -20,6 +20,9 @@ vendor: ## Install or update project dependencies
 broker: $(SOURCES) ## Build the broker
 	go build -i -ldflags="-s -w" ./cmd/broker
 
+hydro: $(SOURCES) ## Build the broker
+	go build -i -ldflags="-s -w" ./cmd/hydro
+
 build: broker ## Build binary from source
 	@echo > /dev/null
 

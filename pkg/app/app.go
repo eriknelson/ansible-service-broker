@@ -56,7 +56,7 @@ var (
 	// Scheme - the runtime scheme
 	Scheme = runtime.NewScheme()
 	// Codecs -k8s codecs for the scheme
-	Codecs = serializer.NewCodecFactory(Scheme)
+	codecs = serializer.NewCodecFactory(Scheme)
 	// log - logging object
 	log = logutil.NewLog()
 )

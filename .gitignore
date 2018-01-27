@@ -33,6 +33,7 @@ etc/mock.config.yaml
 #Compiled binaries
 /broker
 build/broker
+/hydro
 
 # python artifacts
 .python-version
@@ -59,3 +60,6 @@ validation.out
 
 # Vendor ci binary
 vendor/github.com/rthallisey/service-broker-ci/ci
+
+.idea
+.directory
