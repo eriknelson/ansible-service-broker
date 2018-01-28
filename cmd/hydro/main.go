@@ -18,20 +18,17 @@ package main
 
 import (
 	hydro "github.com/openshift/ansible-service-broker/pkg/hydro/app"
-	"github.com/openshift/ansible-service-broker/pkg/hydro/demobroker"
-	"github.com/openshift/ansible-service-broker/pkg/hydro/log"
 	"github.com/openshift/ansible-service-broker/pkg/hydro/server"
+	asb "github.com/openshift/ansible-service-broker/pkg/broker"
 )
 
 func main() {
-	app := hydro.NewApp(demobroker.NewDemoBroker(), hydro.Config{
-		log.LogConfig{Stdout: true, Level: "debug", Color: true},
-		server.HandlerConfig{RequestDebug: true, Prefix: "/"},
-	})
+	broker := asb.NewAnsibleBroker()
+	asbServer := server.NewAnsibleBrokerServer()
+	app := hydro.NewAppWithServer(broker, asbServer)
 	app.Start()
-
-	//app.RegisterBroker(NewAnsibleBroker())
-	//app.RegisterJobs(NewJobManifest())
-	//app.RegisterSubscribers(NewSubscriberManifest())
-	//err := app.Start()
+	//app := hydro.NewApp(broker.NewAnsibleBroker(), hydro.Config{
+	//	log.LogConfig{Stdout: true, Level: "debug", Color: true},
+	//	server.HandlerConfig{RequestDebug: true, Prefix: "/"},
+	//})
 }
