@@ -47,6 +47,8 @@ var (
 	ErrorParameterNotFound = errors.New("parameter not found")
 	// ErrorPlanUpdateNotPossible - Error when a Plan Update request cannot be satisfied
 	ErrorPlanUpdateNotPossible = errors.New("plan update not possible")
+	// ErrorForbidden - Should be returned by broker handler if the user does not have sufficient permissions
+	ErrorForbidden = errors.New("User does not have sufficient permissions")
 )
 
 // Parameters - generic string to object or value parameter

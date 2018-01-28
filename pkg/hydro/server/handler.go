@@ -97,7 +97,7 @@ func NewOpenServiceBrokerHandler(broker osb.OpenServiceBroker, config HandlerCon
 	//	s.HandleFunc("/v2/apb", createVarHandler(h.apbRemoveSpecs)).Methods("DELETE")
 	//}
 
-	return r // handlers.LoggingHandler(os.Stdout, r)
+	return r
 }
 
 func createVarHandler(r VarHandler) GorillaRouteHandler {
@@ -128,6 +128,11 @@ func (h handler) provision(w http.ResponseWriter, r *http.Request, params map[st
 	// ignore the error, if async can't be parsed it will be false
 	async, _ := strconv.ParseBool(r.FormValue("accepts_incomplete"))
 
+	planID := r.FormValue("plan_id")
+	if planID == "" {
+		writeResponse(w, http.StatusBadRequest, osb.ErrorResponse{Description: "provision request missing plan_id query parameter"})
+	}
+
 	var req *osb.ProvisionRequest
 	err := readRequest(r, &req)
 
@@ -136,27 +141,7 @@ func (h handler) provision(w http.ResponseWriter, r *http.Request, params map[st
 		return
 	}
 
-	// TODO: Need to push this into the ASB!
-	// if !h.brokerConfig.GetBool("broker.auto_escalate") {
-	//	userInfo, ok := r.Context().Value(UserInfoContext).(broker.UserInfo)
-	//	if !ok {
-	//		log.Debugf("unable to retrieve user info from request context")
-	//		// if no user, we should error out with bad request.
-	//		writeResponse(w, http.StatusBadRequest, broker.osb.ErrorResponse{
-	//			Description: "Invalid user info from originating origin header.",
-	//		})
-	//		return
-	//	}
-	//
-	//	if ok, status, err := h.validateUser(userInfo, req.Context.Namespace); !ok {
-	//		writeResponse(w, status, broker.osb.ErrorResponse{Description: err.Error()})
-	//		return
-	//	}
-	//} else {
-	//	log.Debugf("Auto Escalate has been set to true, we are escalating permissions")
-	//}
-
-	resp, err := h.broker.Provision(instanceUUID, req, async)
+	resp, err := h.broker.Provision(instanceUUID, req, async, r.Context())
 
 	if err != nil {
 		switch err {
@@ -208,36 +193,7 @@ func (h handler) deprovision(w http.ResponseWriter, r *http.Request, params map[
 		}
 	}
 
-	// TODO: Need to push this into ASB
-	//nsDeleted, err := isNamespaceDeleted(serviceInstance.Context.Namespace)
-	//if err != nil {
-	//	writeResponse(w, http.StatusInternalServerError, broker.osb.ErrorResponse{Description: err.Error()})
-	//	return
-	//}
-	//
-	//if !h.brokerConfig.GetBool("broker.auto_escalate") {
-	//	userInfo, ok := r.Context().Value(UserInfoContext).(broker.UserInfo)
-	//	if !ok {
-	//		log.Debugf("unable to retrieve user info from request context")
-	//		// if no user, we should error out with bad request.
-	//		writeResponse(w, http.StatusBadRequest, broker.osb.ErrorResponse{
-	//			Description: "Invalid user info from originating origin header.",
-	//		})
-	//		return
-	//	}
-	//
-	//	if !nsDeleted {
-	//		ok, status, err := h.validateUser(userInfo, serviceInstance.Context.Namespace)
-	//		if !ok {
-	//			writeResponse(w, status, broker.osb.ErrorResponse{Description: err.Error()})
-	//			return
-	//		}
-	//	}
-	//} else {
-	//	log.Debugf("Auto Escalate has been set to true, we are escalating permissions")
-	//}
-
-	resp, err := h.broker.Deprovision(*serviceInstance, planID, async)
+	resp, err := h.broker.Deprovision(*serviceInstance, planID, async, r.Context())
 
 	if err != nil {
 		switch err {
@@ -249,6 +205,9 @@ func (h handler) deprovision(w http.ResponseWriter, r *http.Request, params map[
 			return
 		case osb.ErrorDeprovisionInProgress:
 			writeResponse(w, http.StatusAccepted, osb.DeprovisionResponse{})
+			return
+		default:
+			writeResponse(w, http.StatusInternalServerError, osb.ErrorResponse{Description: err.Error()})
 			return
 		}
 	} else if async {
@@ -307,11 +266,6 @@ func (h handler) bind(w http.ResponseWriter, r *http.Request, params map[string]
 	// ignore the error, if async can't be parsed it will be false
 	async, _ := strconv.ParseBool(r.FormValue("accepts_incomplete"))
 
-	// TODO: Push to ASB
-	//if !async && h.brokerConfig.GetBool("broker.launch_apb_on_bind") {
-	//	log.Warning("launch_apb_on_bind is enabled, but accepts_incomplete is false, binding may fail")
-	//}
-
 	var req *osb.BindRequest
 	if err := readRequest(r, &req); err != nil {
 		writeResponse(w, http.StatusInternalServerError, osb.ErrorResponse{Description: err.Error()})
@@ -329,27 +283,7 @@ func (h handler) bind(w http.ResponseWriter, r *http.Request, params map[string]
 		return
 	}
 
-	// TODO: Push to ASB
-	//if !h.brokerConfig.GetBool("broker.auto_escalate") {
-	//	userInfo, ok := r.Context().Value(UserInfoContext).(broker.UserInfo)
-	//	if !ok {
-	//		log.Debugf("unable to retrieve user info from request context")
-	//		// if no user, we should error out with bad request.
-	//		writeResponse(w, http.StatusBadRequest, broker.osb.ErrorResponse{
-	//			Description: "Invalid user info from originating origin header.",
-	//		})
-	//		return
-	//	}
-	//
-	//	if ok, status, err := h.validateUser(userInfo, serviceInstance.Context.Namespace); !ok {
-	//		writeResponse(w, status, broker.osb.ErrorResponse{Description: err.Error()})
-	//		return
-	//	}
-	//} else {
-	//	log.Debugf("Auto Escalate has been set to true, we are escalating permissions")
-	//}
-
-	resp, ranAsync, err := h.broker.Bind(*serviceInstance, bindingUUID, req, async)
+	resp, ranAsync, err := h.broker.Bind(*serviceInstance, bindingUUID, req, async, r.Context())
 
 	if err != nil {
 		switch err {
@@ -394,11 +328,6 @@ func (h handler) unbind(w http.ResponseWriter, r *http.Request, params map[strin
 	// ignore the error, if async can't be parsed it will be false
 	async, _ := strconv.ParseBool(r.FormValue("accepts_incomplete"))
 
-	// TODO: push to ASB
-	//if !async && h.brokerConfig.GetBool("broker.launch_apb_on_bind") {
-	//	log.Warning("launch_apb_on_bind is enabled, but accepts_incomplete is false, unbinding may fail")
-	//}
-
 	serviceInstance, err := h.broker.GetServiceInstance(instanceUUID)
 	if err != nil {
 		switch err {
@@ -421,34 +350,7 @@ func (h handler) unbind(w http.ResponseWriter, r *http.Request, params map[strin
 		return
 	}
 
-	// TODO: Push to ASB
-	//nsDeleted, err := isNamespaceDeleted(serviceInstance.Context.Namespace)
-	//if err != nil {
-	//	writeResponse(w, http.StatusInternalServerError, broker.osb.ErrorResponse{Description: err.Error()})
-	//	return
-	//}
-
-	//if !h.brokerConfig.GetBool("broker.auto_escalate") {
-	//	userInfo, ok := r.Context().Value(UserInfoContext).(broker.UserInfo)
-	//	if !ok {
-	//		log.Debugf("unable to retrieve user info from request context")
-	//		// if no user, we should error out with bad request.
-	//		writeResponse(w, http.StatusBadRequest, broker.osb.ErrorResponse{
-	//			Description: "Invalid user info from originating origin header.",
-	//		})
-	//		return
-	//	}
-	//	if !nsDeleted {
-	//		if ok, status, err := h.validateUser(userInfo, serviceInstance.Context.Namespace); !ok {
-	//			writeResponse(w, status, broker.osb.ErrorResponse{Description: err.Error()})
-	//			return
-	//		}
-	//	}
-	//} else {
-	//	log.Debugf("Auto Escalate has been set to true, we are escalating permissions")
-	//}
-
-	resp, err := h.broker.Unbind(*serviceInstance, *bindInstance, planID, async)
+	resp, err := h.broker.Unbind(*serviceInstance, *bindInstance, planID, async, r.Context())
 
 	if err != nil {
 		switch err {
@@ -517,26 +419,7 @@ func (h handler) update(w http.ResponseWriter, r *http.Request, params map[strin
 	// ignore the error, if async can't be parsed it will be false
 	async, _ := strconv.ParseBool(r.FormValue("accepts_incomplete"))
 
-	//if !h.brokerConfig.GetBool("broker.auto_escalate") {
-	//	userInfo, ok := r.Context().Value(UserInfoContext).(broker.UserInfo)
-	//	if !ok {
-	//		log.Debugf("unable to retrieve user info from request context")
-	//		// if no user, we should error out with bad request.
-	//		writeResponse(w, http.StatusBadRequest, broker.osb.ErrorResponse{
-	//			Description: "Invalid user info from originating origin header.",
-	//		})
-	//		return
-	//	}
-
-	//	if ok, status, err := h.validateUser(userInfo, req.Context.Namespace); !ok {
-	//		writeResponse(w, status, broker.osb.ErrorResponse{Description: err.Error()})
-	//		return
-	//	}
-	//} else {
-	//	log.Debugf("Auto Escalate has been set to true, we are escalating permissions")
-	//}
-
-	resp, err := h.broker.Update(instanceUUID, req, async)
+	resp, err := h.broker.Update(instanceUUID, req, async, r.Context())
 
 	if err != nil {
 		switch err {

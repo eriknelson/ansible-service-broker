@@ -17,16 +17,17 @@
 package osb
 
 import (
+	"context"
 	"github.com/pborman/uuid"
 )
 
 type OpenServiceBroker interface {
 	Catalog() (*CatalogResponse, error)
-	Provision(uuid.UUID, *ProvisionRequest, bool) (*ProvisionResponse, error)
-	Deprovision(ServiceInstance, string, bool) (*DeprovisionResponse, error)
-	Bind(ServiceInstance, uuid.UUID, *BindRequest, bool) (*BindResponse, bool, error)
-	Unbind(ServiceInstance, BindInstance, string, bool) (*UnbindResponse, error)
-	Update(uuid.UUID, *UpdateRequest, bool) (*UpdateResponse, error)
+	Provision(uuid.UUID, *ProvisionRequest, bool, context.Context) (*ProvisionResponse, error)
+	Deprovision(ServiceInstance, string, bool, context.Context) (*DeprovisionResponse, error)
+	Bind(ServiceInstance, uuid.UUID, *BindRequest, bool, context.Context) (*BindResponse, bool, error)
+	Unbind(ServiceInstance, BindInstance, string, bool, context.Context) (*UnbindResponse, error)
+	Update(uuid.UUID, *UpdateRequest, bool, context.Context) (*UpdateResponse, error)
 	LastOperation(uuid.UUID, *LastOperationRequest) (*LastOperationResponse, error)
 	GetServiceInstance(uuid.UUID) (*ServiceInstance, error)
 	GetBindInstance(uuid.UUID) (*BindInstance, error)

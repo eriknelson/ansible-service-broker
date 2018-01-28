@@ -17,6 +17,7 @@
 package broker
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -33,35 +34,18 @@ import (
 	"github.com/openshift/ansible-service-broker/pkg/registries"
 	logutil "github.com/openshift/ansible-service-broker/pkg/util/logging"
 	"github.com/pborman/uuid"
+	"github.com/openshift/ansible-service-broker/pkg/hydro/osb"
+	"github.com/openshift/ansible-service-broker/pkg/clients"
+	"k8s.io/kubernetes/pkg/registry/rbac/validation"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
-var (
-	// ErrorAlreadyProvisioned - Error for when an service instance has already been provisioned
-	ErrorAlreadyProvisioned = errors.New("already provisioned")
-	// ErrorDuplicate - Error for when a duplicate service instance already exists
-	ErrorDuplicate = errors.New("duplicate instance")
-	// ErrorNotFound  - Error for when a service instance is not found. (either etcd or kubernetes)
-	ErrorNotFound = errors.New("not found")
-	// ErrorBindingExists - Error for when deprovision is called on a service
-	// instance with active bindings, or bind requested for already-existing
-	// binding
-	ErrorBindingExists = errors.New("binding exists")
-	// ErrorProvisionInProgress - Error for when provision is called on a service instance that has a provision job in progress
-	ErrorProvisionInProgress = errors.New("provisiot in progress")
-	// ErrorDeprovisionInProgress - Error for when deprovision is called on a service instance that has a deprovision job in progress
-	ErrorDeprovisionInProgress = errors.New("deprovision in progress")
-	// ErrorUpdateInProgress - Error for when update is called on a service instance that has an update job in progress
-	ErrorUpdateInProgress = errors.New("update in progress")
-	// ErrorPlanNotFound - Error for when plan for update not found
-	ErrorPlanNotFound = errors.New("plan not found")
-	// ErrorParameterNotUpdatable - Error for when parameter in update request is not updatable
-	ErrorParameterNotUpdatable = errors.New("parameter not updatable")
-	// ErrorParameterNotFound - Error for when a parameter for update is not found
-	ErrorParameterNotFound = errors.New("parameter not found")
-	// ErrorPlanUpdateNotPossible - Error when a Plan Update request cannot be satisfied
-	ErrorPlanUpdateNotPossible = errors.New("plan update not possible")
-	log                        = logutil.NewLog()
-)
+var log = logutil.NewLog()
+
+// requestContextKey - keys that will be used in the request context
+type requestContextKey string
 
 const (
 	// provisionCredentialsKey - Key used to pass credentials to apb.
@@ -70,23 +54,10 @@ const (
 	bindCredentialsKey = "_apb_bind_creds"
 	// fqNameRegex - regular expression used when forming FQName.
 	fqNameRegex = "[/.:-]"
+	// userInfoContext - Broker.UserInfo retrieved from the
+	// originating identity header
+	userInfoContext requestContextKey = "userInfo"
 )
-
-// Broker - A broker is used to to compelete all the tasks that a broker must be able to do.
-type Broker interface {
-	Bootstrap() (*BootstrapResponse, error)
-	Catalog() (*CatalogResponse, error)
-	Provision(uuid.UUID, *ProvisionRequest, bool) (*ProvisionResponse, error)
-	Update(uuid.UUID, *UpdateRequest, bool) (*UpdateResponse, error)
-	Deprovision(apb.ServiceInstance, string, bool, bool) (*DeprovisionResponse, error)
-	Bind(apb.ServiceInstance, uuid.UUID, *BindRequest, bool) (*BindResponse, bool, error)
-	Unbind(apb.ServiceInstance, apb.BindInstance, string, bool, bool) (*UnbindResponse, error)
-	LastOperation(uuid.UUID, *LastOperationRequest) (*LastOperationResponse, error)
-	Recover() (string, error)
-	GetServiceInstance(uuid.UUID) (apb.ServiceInstance, error)
-	GetBindInstance(uuid.UUID) (apb.BindInstance, error)
-	GetBind(apb.ServiceInstance, uuid.UUID) (*BindResponse, error)
-}
 
 // Config - Configuration for the broker.
 type Config struct {
@@ -102,45 +73,24 @@ type Config struct {
 	ClusterURL         string `yaml:"cluster_url"`
 }
 
-// DevBroker - Interface for the development broker.
-type DevBroker interface {
-	AddSpec(spec apb.Spec) (*CatalogResponse, error)
-	RemoveSpec(specID string) error
-	RemoveSpecs() error
-}
-
 // AnsibleBroker - Broker using ansible and images to interact with oc/kubernetes/etcd
 type AnsibleBroker struct {
+	args args
 	dao          *dao.Dao
 	registry     []registries.Registry
 	engine       *WorkEngine
 	brokerConfig Config
+	config *config.Config
+	clusterRoleRules []rbac.PolicyRule
 }
 
 // NewAnsibleBroker - Creates a new ansible broker
-func NewAnsibleBroker(dao *dao.Dao,
-	registry []registries.Registry,
-	engine WorkEngine,
-	brokerConfig *config.Config) (*AnsibleBroker, error) {
-
-	broker := &AnsibleBroker{
-		dao:      dao,
-		registry: registry,
-		engine:   &engine,
-		brokerConfig: Config{
-			DevBroker:          brokerConfig.GetBool("dev_broker"),
-			LaunchApbOnBind:    brokerConfig.GetBool("launch_apb_on_bind"),
-			BootstrapOnStartup: brokerConfig.GetBool("bootstrap_on_startup"),
-			Recovery:           brokerConfig.GetBool("recovery"),
-			OutputRequest:      brokerConfig.GetBool("output_request"),
-			SSLCertKey:         brokerConfig.GetString("ssl_cert_key"),
-			SSLCert:            brokerConfig.GetString("ssl_cert"),
-			RefreshInterval:    brokerConfig.GetString("refresh_interval"),
-			AutoEscalate:       brokerConfig.GetBool("auto_escalate"),
-			ClusterURL:         brokerConfig.GetString("cluster_url"),
-		},
-	}
-	return broker, nil
+func NewAnsibleBroker() (*AnsibleBroker) {
+	// May need something else here in the future, so it's useful to have the func in front.
+	// After the former app logic moved to Initialize, there isn't much to be done here,
+	// because the setup was formally done outside of the broker and injected.
+	// It's now done inside the broker.
+	return &AnsibleBroker{}
 }
 
 // GetServiceInstance - retrieve the service instance for a instanceID.
@@ -149,7 +99,7 @@ func (a AnsibleBroker) GetServiceInstance(instanceUUID uuid.UUID) (apb.ServiceIn
 	if err != nil {
 		if client.IsKeyNotFound(err) {
 			log.Errorf("Could not find a service instance in dao - %v", err)
-			return apb.ServiceInstance{}, ErrorNotFound
+			return apb.ServiceInstance{}, osb.ErrorNotFound
 		}
 		log.Error("Couldn't find a service instance: ", err)
 		return apb.ServiceInstance{}, err
@@ -159,15 +109,15 @@ func (a AnsibleBroker) GetServiceInstance(instanceUUID uuid.UUID) (apb.ServiceIn
 }
 
 // GetBindInstance - retrieve the bind instance for a bindUUID
-func (a AnsibleBroker) GetBindInstance(bindUUID uuid.UUID) (apb.BindInstance, error) {
+func (a AnsibleBroker) GetBindInstance(bindUUID uuid.UUID) (*apb.BindInstance, error) {
 	instance, err := a.dao.GetBindInstance(bindUUID.String())
 	if err != nil {
 		if client.IsKeyNotFound(err) {
-			return apb.BindInstance{}, ErrorNotFound
+			return &apb.BindInstance{}, osb.ErrorNotFound
 		}
-		return apb.BindInstance{}, err
+		return &apb.BindInstance{}, err
 	}
-	return *instance, nil
+	return instance, nil
 }
 
 // Bootstrap - Loads all known specs from a registry into local storage for reference
@@ -478,7 +428,8 @@ func (a AnsibleBroker) Catalog() (*CatalogResponse, error) {
 }
 
 // Provision  - will provision a service
-func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, async bool,
+func (a AnsibleBroker) Provision(
+	instanceUUID uuid.UUID, req *ProvisionRequest, async bool, rawContext context.Context,
 ) (*ProvisionResponse, error) {
 	////////////////////////////////////////////////////////////
 	//type ProvisionRequest struct {
@@ -513,6 +464,11 @@ func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, 
 	////////////////////////////////////////////////////////////
 	// Provision Flow
 	// -> Retrieve Spec from etcd (if missing, 400, this returns err missing)
+	// -> TODO: Check to see if the spec supports or requires async, and reconcile
+	//    need a typed error condition so the REST server knows correct response
+	//    depending on the scenario
+	//    (async requested, unsupported, 422)
+	//    (async not requested, required, ?)
 	// -> Make entry in /instance, ID'd by instance. Value should be Instance type
 	//    Purpose is to make sure everything neeed to deprovision is available
 	//    in persistence.
@@ -525,20 +481,17 @@ func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, 
 		dao.SetState returns what error?
 		Provision returns what error?
 		SetExtractedCredentials returns what error?
-
 		broker
 		* normal synchronous return ProvisionResponse
 		* normal async return ProvisionResponse
 		* if instance already exists with the same params, return ProvisionResponse, AND InstanceExists
 		* if instance already exists DIFFERENT param, return nil AND InstanceExists
-
 		handler returns the following
 		* synchronous provision return 201 created
 		* instance already exists with IDENTICAL parameters to existing instance, 200 OK
 		* async provision 202 Accepted
 		* instance already exists with DIFFERENT parameters, 409 Conflict {}
 		* if only support async and no accepts_incomplete=true passed in, 422 Unprocessable entity
-
 	*/
 	var spec *apb.Spec
 	var err error
@@ -549,7 +502,7 @@ func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, 
 	if spec, err = a.dao.GetSpec(specID); err != nil {
 		// etcd return not found i.e. code 100
 		if client.IsKeyNotFound(err) {
-			return nil, ErrorNotFound
+			return nil, osb.ErrorNotFound
 		}
 		// otherwise unknown error bubble it up
 		return nil, err
@@ -561,18 +514,11 @@ func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, 
 		parameters = make(apb.Parameters)
 	}
 
-	if req.PlanID == "" {
-		errMsg :=
-			"PlanID from provision request is blank. " +
-				"Provision requests must specify PlanIDs"
-		return nil, errors.New(errMsg)
-	}
-
 	planName, err = a.dao.GetPlanName(req.PlanID)
 	if err != nil {
 		// etcd return not found i.e. code 100
 		if client.IsKeyNotFound(err) {
-			return nil, ErrorNotFound
+			return nil, osb.ErrorNotFound
 		}
 		// otherwise unknown error bubble it up
 		return nil, err
@@ -614,25 +560,26 @@ func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, 
 				}
 				if alreadyInProgress {
 					log.Infof("Provision requested for instance %s, but job is already in progress", serviceInstance.ID)
-					return &ProvisionResponse{Operation: jobToken}, ErrorProvisionInProgress
+					return &ProvisionResponse{Operation: jobToken}, osb.ErrorProvisionInProgress
 				}
 				log.Debug("already have this instance returning 200")
-				return &ProvisionResponse{}, ErrorAlreadyProvisioned
+				return &ProvisionResponse{}, osb.ErrorAlreadyProvisioned
 			}
 			log.Info("we have a duplicate instance with parameters that differ, returning 409 conflict")
-			return nil, ErrorDuplicate
+			return nil, osb.ErrorDuplicate
 		}
 	}
 
-	//
-	// Looks like this is a new provision, let's get started.
-	//
+	// Looks like this is a new provision, check privilege first, then let's get started
+	if _, err = a.checkEscalation(context.Namespace, rawContext); err != nil {
+		return nil, err
+	}
+
 	if err = a.dao.SetServiceInstance(instanceUUID.String(), serviceInstance); err != nil {
 		return nil, err
 	}
 
 	var token string
-
 	if async {
 		log.Info("ASYNC provisioning in progress")
 		// asyncronously provision and return the token for the lastoperation
@@ -665,7 +612,7 @@ func (a AnsibleBroker) Provision(instanceUUID uuid.UUID, req *ProvisionRequest, 
 
 // Deprovision - will deprovision a service.
 func (a AnsibleBroker) Deprovision(
-	instance apb.ServiceInstance, planID string, skipApbExecution bool, async bool,
+	instance apb.ServiceInstance, planID string, async bool, rawContext context.Context,
 ) (*DeprovisionResponse, error) {
 	////////////////////////////////////////////////////////////
 	// Deprovision flow
@@ -679,12 +626,10 @@ func (a AnsibleBroker) Deprovision(
 	//    decide what's important?
 	//    * delete credentials from etcd
 	//    * if noerror: delete serviceInstance entry with Dao
-	if planID == "" {
-		errMsg := "Deprovision request contains an empty plan_id"
-		return nil, errors.New(errMsg)
-	}
+	////////////////////////////////////////////////////////////
+	var err error
 
-	err := a.validateDeprovision(&instance)
+	err = a.validateDeprovision(&instance)
 	if err != nil {
 		return nil, err
 	}
@@ -696,11 +641,19 @@ func (a AnsibleBroker) Deprovision(
 
 	if alreadyInProgress {
 		log.Infof("Deprovision requested for instance %s, but job is already in progress", instance.ID)
-		return &DeprovisionResponse{Operation: jobToken}, ErrorDeprovisionInProgress
+		return &DeprovisionResponse{Operation: jobToken}, osb.ErrorDeprovisionInProgress
 	}
 
-	var token string
+	// Determined valid request and work likely needs to get done, now check privilege to do so
+	nsDeleted, err := a.checkEscalation(instance.Context.Namespace, rawContext)
+	if err != nil {
+		return nil, err
+	}
 
+	// Broker formerly used nsDeleted as an indicator of whether or not to skipApbExecution
+	skipApbExecution := nsDeleted
+
+	var token string
 	if async {
 		log.Info("ASYNC deprovision in progress")
 		// asynchronously provision and return the token for the lastoperation
@@ -734,7 +687,7 @@ func (a AnsibleBroker) validateDeprovision(instance *apb.ServiceInstance) error 
 	//    https://github.com/openservicebrokerapi/servicebroker/issues/127
 	if len(instance.BindingIDs) > 0 {
 		log.Debugf("Found bindings with ids: %v", instance.BindingIDs)
-		return ErrorBindingExists
+		return osb.ErrorBindingExists
 	}
 
 	return nil
@@ -772,7 +725,7 @@ func (a AnsibleBroker) GetBind(instance apb.ServiceInstance, bindingUUID uuid.UU
 	if err != nil {
 		if client.IsKeyNotFound(err) {
 			log.Warningf("id: %v - could not find bind instance - %v", bindingUUID, err)
-			return nil, ErrorNotFound
+			return nil, osb.ErrorNotFound
 		}
 		log.Warningf("id: %v - unable to retrieve bind instance - %v", bindingUUID, err)
 		return nil, err
@@ -781,7 +734,7 @@ func (a AnsibleBroker) GetBind(instance apb.ServiceInstance, bindingUUID uuid.UU
 	bindExtCreds, err := a.dao.GetExtractedCredentials(bi.ID.String())
 	if err != nil {
 		if client.IsKeyNotFound(err) {
-			return nil, ErrorNotFound
+			return nil, osb.ErrorNotFound
 		}
 
 		return nil, err
@@ -794,7 +747,9 @@ func (a AnsibleBroker) GetBind(instance apb.ServiceInstance, bindingUUID uuid.UU
 // Bind - will create a binding between a service. Parameter "async" declares
 // whether the caller is willing to have the operation run asynchronously. The
 // returned bool will be true if the operation actually ran asynchronously.
-func (a AnsibleBroker) Bind(instance apb.ServiceInstance, bindingUUID uuid.UUID, req *BindRequest, async bool,
+func (a AnsibleBroker) Bind(
+	instance apb.ServiceInstance, bindingUUID uuid.UUID,
+	req *BindRequest, async bool, rawContext context.Context,
 ) (*BindResponse, bool, error) {
 	// binding_id is the id of the binding.
 	// the instanceUUID is the previously provisioned service id.
@@ -802,6 +757,10 @@ func (a AnsibleBroker) Bind(instance apb.ServiceInstance, bindingUUID uuid.UUID,
 	// See if the service instance still exists, if not send back a badrequest.
 
 	// GET SERVICE get provision parameters
+	if !async && a.config.GetBool("broker.launch_apb_on_bind") {
+		log.Warning("launch_apb_on_bind is enabled, but accepts_incomplete is false, binding may fail")
+	}
+
 	params := req.Parameters
 	if params == nil {
 		params = make(apb.Parameters)
@@ -819,7 +778,7 @@ func (a AnsibleBroker) Bind(instance apb.ServiceInstance, bindingUUID uuid.UUID,
 	if err != nil {
 		// etcd return not found i.e. code 100
 		if client.IsKeyNotFound(err) {
-			return nil, false, ErrorNotFound
+			return nil, false, osb.ErrorNotFound
 		}
 		// otherwise unknown error bubble it up
 		return nil, false, err
@@ -844,6 +803,10 @@ func (a AnsibleBroker) Bind(instance apb.ServiceInstance, bindingUUID uuid.UUID,
 		ID:         bindingUUID,
 		ServiceID:  instance.ID,
 		Parameters: &params,
+	}
+
+	if _, err = a.checkEscalation(instance.Context.Namespace, rawContext); err != nil {
+		return nil, false, err
 	}
 
 	// Verify we're not rebinding the same instance. if err is nil, there is an
@@ -873,12 +836,12 @@ func (a AnsibleBroker) Bind(instance apb.ServiceInstance, bindingUUID uuid.UUID,
 				if err != nil {
 					return nil, false, err
 				}
-				return resp, false, ErrorBindingExists
+				return resp, false, osb.ErrorBindingExists
 			}
 
 			// parameters are different
 			log.Info("duplicate binding instance diff params, returning 409 conflict")
-			return nil, false, ErrorDuplicate
+			return nil, false, osb.ErrorDuplicate
 		}
 	}
 
@@ -942,13 +905,11 @@ func (a AnsibleBroker) Bind(instance apb.ServiceInstance, bindingUUID uuid.UUID,
 
 // Unbind - unbind a services previous binding
 func (a AnsibleBroker) Unbind(
-	instance apb.ServiceInstance, bindInstance apb.BindInstance, planID string, skipApbExecution bool, async bool,
+	instance apb.ServiceInstance, bindInstance apb.BindInstance,
+	planID string, async bool, rawContext context.Context,
 ) (*UnbindResponse, error) {
-	if planID == "" {
-		errMsg :=
-			"PlanID from unbind request is blank. " +
-				"Unbind requests must specify PlanIDs"
-		return nil, errors.New(errMsg)
+	if !async && a.config.GetBool("broker.launch_apb_on_bind") {
+		log.Warning("launch_apb_on_bind is enabled, but accepts_incomplete is false, binding may fail")
 	}
 
 	params := make(apb.Parameters)
@@ -982,6 +943,15 @@ func (a AnsibleBroker) Unbind(
 		params["provision_params"] = *serviceInstance.Parameters
 	}
 	metrics.ActionStarted("unbind")
+
+	// Determined valid request and work likely needs to get done, now check privilege to do so
+	nsDeleted, err := a.checkEscalation(instance.Context.Namespace, rawContext);
+	if err != nil {
+		return nil, err
+	}
+
+	// Broker formerly used nsDeleted as an indicator of whether or not to skipApbExecution
+	skipApbExecution := nsDeleted
 
 	var token string
 	var jerr error
@@ -1037,7 +1007,8 @@ func (a AnsibleBroker) Unbind(
 }
 
 // Update  - will update a service
-func (a AnsibleBroker) Update(instanceUUID uuid.UUID, req *UpdateRequest, async bool,
+func (a AnsibleBroker) Update(
+	instanceUUID uuid.UUID, req *UpdateRequest, async bool, rawContext context.Context,
 ) (*UpdateResponse, error) {
 	////////////////////////////////////////////////////////////
 	//type UpdateRequest struct {
@@ -1102,10 +1073,14 @@ func (a AnsibleBroker) Update(instanceUUID uuid.UUID, req *UpdateRequest, async 
 	var fromPlanName, toPlanName string
 	var fromPlan, toPlan *apb.Plan
 
+	if _, err = a.checkEscalation(req.Context.Namespace, rawContext); err != nil {
+		return nil, err
+	}
+
 	si, err := a.dao.GetServiceInstance(instanceUUID.String())
 	if err != nil {
 		log.Debug("Error retrieving instance")
-		return nil, ErrorNotFound
+		return nil, osb.ErrorNotFound
 	}
 
 	////////////////////////////////////////////////////////////
@@ -1128,7 +1103,7 @@ func (a AnsibleBroker) Update(instanceUUID uuid.UUID, req *UpdateRequest, async 
 	}
 	if alreadyInProgress {
 		log.Infof("Update requested for instance %s, but job is already in progress", si.ID)
-		return &UpdateResponse{Operation: jobToken}, ErrorUpdateInProgress
+		return &UpdateResponse{Operation: jobToken}, osb.ErrorUpdateInProgress
 	}
 	////////////////////////////////////////////////////////////
 
@@ -1137,7 +1112,7 @@ func (a AnsibleBroker) Update(instanceUUID uuid.UUID, req *UpdateRequest, async 
 	if err != nil {
 		// etcd return not found i.e. code 100
 		if client.IsKeyNotFound(err) {
-			return nil, ErrorNotFound
+			return nil, osb.ErrorNotFound
 		}
 		// otherwise unknown error bubble it up
 		return nil, err
@@ -1167,18 +1142,18 @@ func (a AnsibleBroker) Update(instanceUUID uuid.UUID, req *UpdateRequest, async 
 		toPlanName, err = a.dao.GetPlanName(req.PlanID)
 		if err != nil {
 			log.Error("Could not find requested PlanID %s in plan name lookup table", req.PlanID)
-			return nil, ErrorPlanNotFound
+			return nil, osb.ErrorPlanNotFound
 		}
 	}
 
 	// Retrieve from/to plans by name, else respond with appropriate error
 	if fromPlan = spec.GetPlan(fromPlanName); fromPlan == nil {
 		log.Error("The plan %s, specified for updating from on instance %s, does not exist.", fromPlanName, si.ID)
-		return nil, ErrorPlanNotFound
+		return nil, osb.ErrorPlanNotFound
 	}
 	if toPlan = spec.GetPlan(toPlanName); toPlan == nil {
 		log.Error("The plan %s, specified for updating to on instance %s, does not exist.", toPlanName, si.ID)
-		return nil, ErrorPlanNotFound
+		return nil, osb.ErrorPlanNotFound
 	}
 
 	// If a plan transition has been requested, validate it is possible and then
@@ -1187,7 +1162,7 @@ func (a AnsibleBroker) Update(instanceUUID uuid.UUID, req *UpdateRequest, async 
 		log.Debug("Validating plan transition from: %s, to: %s", fromPlanName, toPlanName)
 		if ok := a.isValidPlanTransition(fromPlan, toPlanName); !ok {
 			log.Error("The current plan, %s, cannot be updated to the requested plan, %s.", fromPlanName, toPlanName)
-			return nil, ErrorPlanUpdateNotPossible
+			return nil, osb.ErrorPlanUpdateNotPossible
 		}
 
 		log.Debug("Plan transition valid!")
@@ -1331,7 +1306,7 @@ func (a AnsibleBroker) AddSpec(spec apb.Spec) (*CatalogResponse, error) {
 func (a AnsibleBroker) RemoveSpec(specID string) error {
 	spec, err := a.dao.GetSpec(specID)
 	if client.IsKeyNotFound(err) {
-		return ErrorNotFound
+		return osb.ErrorNotFound
 	}
 	if err != nil {
 		log.Error("Something went real bad trying to retrieve spec for deletion... - %v", err)
@@ -1362,3 +1337,73 @@ func (a AnsibleBroker) RemoveSpecs() error {
 	metrics.SpecsLoadedReset()
 	return nil
 }
+
+// TODO: Make sure to update with Shawn's fix that was discovered re: scopes
+// checkEscalation - Checks to confirm user has appropriate permissions for auto escalation
+func (a *AnsibleBroker) checkEscalation(namespace string, reqContext context.Context) (bool, error) {
+	nsDeleted, err := isNamespaceDeleted(namespace)
+	if err != nil {
+		return nsDeleted, err
+	}
+
+	if !a.config.GetBool("broker.auto_escalate") {
+		userInfo, ok := reqContext.Value(userInfoContext).(UserInfo)
+		if !ok {
+			errMsg := "unable to retrieve user info from request context"
+			log.Debugf(errMsg)
+			// if no user, we should error out with bad request.
+			return nsDeleted, errors.New(errMsg)
+		}
+
+		if !nsDeleted {
+			//ok, err := valid(userInfo, namespace)
+			ok, err := validateUser(userInfo, namespace, a.clusterRoleRules)
+			if !ok {
+				return nsDeleted, err
+			}
+		}
+	}
+
+	log.Debugf("Auto Escalate has been set to true, we are escalating permissions")
+	return nsDeleted, nil
+}
+
+// validateUser will use the cached cluster role's rules, and retrieve
+// the rules for the user in the namespace to determine if the user's roles
+// can cover the  all of the cluster role's rules.
+func validateUser(
+	userInfo UserInfo,
+	namespace string,
+	clusterRoleRules []rbac.PolicyRule,
+) (bool, error) {
+	openshiftClient, err := clients.Openshift()
+	if err != nil {
+		return false, fmt.Errorf("Unable to connect to the cluster")
+	}
+	// Retrieving the rules for the user in the namespace.
+	prs, err := openshiftClient.SubjectRulesReview(
+		userInfo.Username, userInfo.Groups, userInfo.Extra, namespace)
+	if err != nil {
+		return false, fmt.Errorf("Unable to connect to the cluster")
+	}
+	if covered, _ := validation.Covers(prs, clusterRoleRules); !covered {
+		return false, osb.ErrorForbidden
+	}
+	return true, nil
+}
+
+// isNamespaceDeleted - Checks if the namespace has been deleted, or is in a currently terminating state.
+func isNamespaceDeleted(name string) (bool, error) {
+	k8scli, err := clients.Kubernetes()
+	if err != nil {
+		return false, err
+	}
+
+	namespace, err := k8scli.Client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	return namespace == nil || namespace.Status.Phase == v1.NamespaceTerminating, nil
+}
+
