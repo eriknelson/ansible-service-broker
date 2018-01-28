@@ -17,7 +17,6 @@
 package server
 
 import (
-	"fmt"
 	"github.com/openshift/ansible-service-broker/pkg/hydro/log"
 	"net/http"
 	"time"
