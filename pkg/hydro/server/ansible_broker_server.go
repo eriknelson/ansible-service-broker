@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/ansible-service-broker/pkg/apb"
 	"gopkg.in/yaml.v2"
 	"github.com/openshift/ansible-service-broker/pkg/version"
+	"net/http/httputil"
 )
 
 type AnsibleBrokerServer struct {
@@ -57,6 +58,8 @@ func (s *AnsibleBrokerServer) ExtendRouter(broker osb.OpenServiceBroker, router 
 		// the router?
 	}
 
+	router.HandleFunc("/v2/bootstrap", createVarHandler(s.bootstrap)).Methods("POST")
+
 	if ansibleBroker.IsDevelopmentBroker() {
 		router.HandleFunc("/v2/apb",
 			createVarHandler(s.apbAddSpec)).Methods("POST")
@@ -69,6 +72,24 @@ func (s *AnsibleBrokerServer) ExtendRouter(broker osb.OpenServiceBroker, router 
 
 func (s *AnsibleBrokerServer) StartServer(h *http.Handler) {
 	s.kubernetesServer.StartServer(h)
+}
+
+func (s *AnsibleBrokerServer) bootstrap(w http.ResponseWriter, r *http.Request, params map[string]string) {
+	defer r.Body.Close()
+	if s.broker.ShouldOutputRequest() {
+		b, err := httputil.DumpRequest(r, true)
+		if err != nil {
+			log.Errorf("unable to dump request to log: %v", err)
+		}
+		log.Infof("Request: %q", b)
+	}
+	resp, err := s.broker.Bootstrap()
+	if err != nil {
+		writeResponse(w, http.StatusInternalServerError, osb.ErrorResponse{Description: err.Error()})
+		return
+	}
+
+	writeDefaultResponse(w, http.StatusOK, resp, err)
 }
 
 // apbAddSpec - Development only route. Will be used by for local developers to add images to the catalog.
