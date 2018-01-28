@@ -57,6 +57,7 @@ type Parameters map[string]interface{}
 // Context - Determines the context in which the service is running
 type Context struct {
 	Platform  string `json:"platform"`
+	// TODO: Namespace doesn't belong on an OSB type, need to find a better place for it in ASB.
 	Namespace string `json:"namespace"`
 }
 
@@ -65,6 +66,7 @@ type ServiceInstance struct {
 	ID         uuid.UUID       `json:"id"`
 	PlanID     uuid.UUID       `json:"plan_id"`
 	Context    *Context        `json:"context"`
+	// TODO: Parameters doesn't need to be a pointer, it's a map (ref) naturally
 	Parameters *Parameters     `json:"parameters"`
 	BindingIDs map[string]bool `json:"binding_ids"`
 }
@@ -227,23 +229,19 @@ type LastOperationRequest struct {
 	Operation string `json:"operation"`
 }
 
-// LastOperationState - State that the Last Operation is allowed to be.
-// https://github.com/openservicebrokerapi/servicebroker/blob/v2.12/spec.md#body
-type LastOperationState string
-
 const (
 	// LastOperationStateInProgress - In Progress state for last operation.
-	LastOperationStateInProgress LastOperationState = "in progress"
+	LastOperationStateInProgress = "in progress"
 	// LastOperationStateSucceeded - Succeeded state for the last operation.
-	LastOperationStateSucceeded LastOperationState = "succeeded"
+	LastOperationStateSucceeded = "succeeded"
 	// LastOperationStateFailed - Failed state for the last operation.
-	LastOperationStateFailed LastOperationState = "failed"
+	LastOperationStateFailed = "failed"
 )
 
 // LastOperationResponse - Response for the laster operation request.
 // Defined here https://github.com/openservicebrokerapi/servicebroker/blob/v2.12/spec.md#response-1
 type LastOperationResponse struct {
-	State       LastOperationState `json:"state"`
+	State       string `json:"state"`
 	Description string             `json:"description,omitempty"`
 }
 

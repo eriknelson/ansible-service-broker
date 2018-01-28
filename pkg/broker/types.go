@@ -23,6 +23,7 @@ import (
 	schema "github.com/lestrrat/go-jsschema"
 	"github.com/openshift/ansible-service-broker/pkg/apb"
 	"github.com/pborman/uuid"
+	"github.com/openshift/ansible-service-broker/pkg/hydro/osb"
 )
 
 const (
@@ -214,7 +215,7 @@ type BindResponse struct {
 }
 
 // NewBindResponse - creates a BindResponse based on available credentials.
-func NewBindResponse(pCreds, bCreds *apb.ExtractedCredentials) (*BindResponse, error) {
+func NewBindResponse(pCreds, bCreds *apb.ExtractedCredentials) (*osb.BindResponse, error) {
 	// Can't bind to anything if we have nothing to return to the catalog
 	if pCreds == nil && bCreds == nil {
 		log.Errorf("No extracted credentials found from provision or bind instance ID")
@@ -223,11 +224,11 @@ func NewBindResponse(pCreds, bCreds *apb.ExtractedCredentials) (*BindResponse, e
 
 	if bCreds != nil {
 		log.Debugf("bind creds: %v", bCreds.Credentials)
-		return &BindResponse{Credentials: bCreds.Credentials}, nil
+		return &osb.BindResponse{Credentials: bCreds.Credentials}, nil
 	}
 
 	log.Debugf("provision bind creds: %v", pCreds.Credentials)
-	return &BindResponse{Credentials: pCreds.Credentials}, nil
+	return &osb.BindResponse{Credentials: pCreds.Credentials}, nil
 }
 
 // DeprovisionResponse - Response for a deprovision

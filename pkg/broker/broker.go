@@ -108,15 +108,15 @@ func (a AnsibleBroker) GetServiceInstance(instanceUUID uuid.UUID) (*osb.ServiceI
 }
 
 // GetBindInstance - retrieve the bind instance for a bindUUID
-func (a AnsibleBroker) GetBindInstance(bindUUID uuid.UUID) (*apb.BindInstance, error) {
+func (a AnsibleBroker) GetBindInstance(bindUUID uuid.UUID) (*osb.BindInstance, error) {
 	instance, err := a.dao.GetBindInstance(bindUUID.String())
 	if err != nil {
 		if client.IsKeyNotFound(err) {
-			return &apb.BindInstance{}, osb.ErrorNotFound
+			return &osb.BindInstance{}, osb.ErrorNotFound
 		}
-		return &apb.BindInstance{}, err
+		return &osb.BindInstance{}, err
 	}
-	return instance, nil
+	return instance.OsbTransform(), nil
 }
 
 // Bootstrap - Loads all known specs from a registry into local storage for reference
@@ -429,7 +429,7 @@ func (a AnsibleBroker) Catalog() (*osb.CatalogResponse, error) {
 // Provision  - will provision a service
 func (a AnsibleBroker) Provision(
 	instanceUUID uuid.UUID, req *osb.ProvisionRequest, async bool, rawContext context.Context,
-) (*ProvisionResponse, error) {
+) (*osb.ProvisionResponse, error) {
 	////////////////////////////////////////////////////////////
 	//type ProvisionRequest struct {
 
@@ -535,11 +535,12 @@ func (a AnsibleBroker) Provision(
 	parameters[apb.ServiceInstIDKey] = instanceUUID.String()
 
 	// Build and persist record of service instance
+	p := apb.ParamFromOsb(parameters)
 	serviceInstance := &apb.ServiceInstance{
 		ID:         instanceUUID,
 		Spec:       spec,
-		Context:    context,
-		Parameters: &parameters,
+		Context:    apb.ContextFromOsb(context),
+		Parameters: &p,
 	}
 
 	// Verify we're not reprovisioning the same instance
@@ -559,10 +560,10 @@ func (a AnsibleBroker) Provision(
 				}
 				if alreadyInProgress {
 					log.Infof("Provision requested for instance %s, but job is already in progress", serviceInstance.ID)
-					return &ProvisionResponse{Operation: jobToken}, osb.ErrorProvisionInProgress
+					return &osb.ProvisionResponse{Operation: jobToken}, osb.ErrorProvisionInProgress
 				}
 				log.Debug("already have this instance returning 200")
-				return &ProvisionResponse{}, osb.ErrorAlreadyProvisioned
+				return &osb.ProvisionResponse{}, osb.ErrorAlreadyProvisioned
 			}
 			log.Info("we have a duplicate instance with parameters that differ, returning 409 conflict")
 			return nil, osb.ErrorDuplicate
@@ -606,13 +607,13 @@ func (a AnsibleBroker) Provision(
 	// TODO: What data needs to be sent back on a response?
 	// Not clear what dashboardURL means in an AnsibleApp context
 	// operation should be the task id from the work_engine
-	return &ProvisionResponse{Operation: token}, nil
+	return &osb.ProvisionResponse{Operation: token}, nil
 }
 
 // Deprovision - will deprovision a service.
 func (a AnsibleBroker) Deprovision(
 	instance osb.ServiceInstance, planID string, async bool, rawContext context.Context,
-) (*DeprovisionResponse, error) {
+) (*osb.DeprovisionResponse, error) {
 	////////////////////////////////////////////////////////////
 	// Deprovision flow
 	// -> Lookup bindings by instance ID; 400 if any are active, related issue:
@@ -640,7 +641,7 @@ func (a AnsibleBroker) Deprovision(
 
 	if alreadyInProgress {
 		log.Infof("Deprovision requested for instance %s, but job is already in progress", instance.ID)
-		return &DeprovisionResponse{Operation: jobToken}, osb.ErrorDeprovisionInProgress
+		return &osb.DeprovisionResponse{Operation: jobToken}, osb.ErrorDeprovisionInProgress
 	}
 
 	// Determined valid request and work likely needs to get done, now check privilege to do so
@@ -668,7 +669,7 @@ func (a AnsibleBroker) Deprovision(
 			log.Error("Failed to start new job for async deprovision\n%s", err.Error())
 			return nil, err
 		}
-		return &DeprovisionResponse{Operation: token}, nil
+		return &osb.DeprovisionResponse{Operation: token}, nil
 	}
 
 	if !skipApbExecution {
@@ -683,7 +684,7 @@ func (a AnsibleBroker) Deprovision(
 	if err != nil {
 		return nil, err
 	}
-	return &DeprovisionResponse{}, nil
+	return &osb.DeprovisionResponse{}, nil
 }
 
 func (a AnsibleBroker) validateDeprovision(instance *osb.ServiceInstance) error {
@@ -718,7 +719,7 @@ func (a AnsibleBroker) isJobInProgress(
 
 // GetBind - will return the binding between a service created via an async
 // binding event.
-func (a AnsibleBroker) GetBind(instance apb.ServiceInstance, bindingUUID uuid.UUID) (*BindResponse, error) {
+func (a AnsibleBroker) GetBind(instance osb.ServiceInstance, bindingUUID uuid.UUID) (*osb.BindResponse, error) {
 
 	log.Debug("broker.GetBind: entered GetBind")
 
@@ -756,8 +757,8 @@ func (a AnsibleBroker) GetBind(instance apb.ServiceInstance, bindingUUID uuid.UU
 // returned bool will be true if the operation actually ran asynchronously.
 func (a AnsibleBroker) Bind(
 	instance osb.ServiceInstance, bindingUUID uuid.UUID,
-	req *BindRequest, async bool, rawContext context.Context,
-) (*BindResponse, bool, error) {
+	req *osb.BindRequest, async bool, rawContext context.Context,
+) (*osb.BindResponse, bool, error) {
 	// binding_id is the id of the binding.
 	// the instanceUUID is the previously provisioned service id.
 	//
@@ -770,7 +771,7 @@ func (a AnsibleBroker) Bind(
 
 	params := req.Parameters
 	if params == nil {
-		params = make(apb.Parameters)
+		params = make(osb.Parameters)
 	}
 
 	// Inject PlanID into parameters passed to APBs
@@ -806,10 +807,11 @@ func (a AnsibleBroker) Bind(
 	params[apb.ServiceInstIDKey] = instance.ID.String()
 
 	// Create a BindingInstance with a reference to the serviceinstance.
+	asbParams := apb.ParamFromOsb(params)
 	bindingInstance := &apb.BindInstance{
 		ID:         bindingUUID,
 		ServiceID:  instance.ID,
-		Parameters: &params,
+		Parameters: &asbParams,
 	}
 
 	if _, err = a.checkEscalation(instance.Context.Namespace, rawContext); err != nil {
@@ -879,18 +881,18 @@ func (a AnsibleBroker) Bind(
 		// asynchronous mode, requires that the launch apb config
 		// entry is on, and that async comes in from the catalog
 		log.Info("ASYNC binding in progress")
-		bindjob := NewBindingJob(apbServiceInstance, bindingUUID, &params, apb.Bind)
+		bindjob := NewBindingJob(apbServiceInstance, bindingUUID, &asbParams, apb.Bind)
 
 		token, err = a.engine.StartNewJob("", bindjob, BindingTopic)
 		if err != nil {
 			log.Error("Failed to start new job for async binding\n%s", err.Error())
 			return nil, false, err
 		}
-		return &BindResponse{Operation: token}, true, nil
+		return &osb.BindResponse{Operation: token}, true, nil
 	} else if a.brokerConfig.LaunchApbOnBind {
 		// we are synchronous mode
 		log.Info("Broker configured to run APB bind")
-		_, bindExtCreds, err = apb.Bind(apbServiceInstance, &params)
+		_, bindExtCreds, err = apb.Bind(apbServiceInstance, &asbParams)
 
 		if err != nil {
 			return nil, false, err
@@ -917,9 +919,9 @@ func (a AnsibleBroker) Bind(
 
 // Unbind - unbind a services previous binding
 func (a AnsibleBroker) Unbind(
-	instance osb.ServiceInstance, bindInstance apb.BindInstance,
+	instance osb.ServiceInstance, bindInstance osb.BindInstance,
 	planID string, async bool, rawContext context.Context,
-) (*UnbindResponse, error) {
+) (*osb.UnbindResponse, error) {
 	if !async && a.config.GetBool("broker.launch_apb_on_bind") {
 		log.Warning("launch_apb_on_bind is enabled, but accepts_incomplete is false, binding may fail")
 	}
@@ -976,7 +978,8 @@ func (a AnsibleBroker) Unbind(
 		// asynchronous mode, required that the launch apb config
 		// entry is on, and that async comes in from the catalog
 		log.Info("ASYNC unbinding in progress")
-		unbindjob := NewUnbindingJob(apbServiceInstance, &bindInstance, &params, apb.Unbind, skipApbExecution)
+		unbindjob := NewUnbindingJob(
+			apbServiceInstance, apb.BindInstanceFromOsb(&bindInstance), &params, apb.Unbind, skipApbExecution)
 		token, jerr = a.engine.StartNewJob("", unbindjob, UnbindingTopic)
 		if jerr != nil {
 			log.Error("Failed to start new job for async unbind\n%s", jerr.Error())
@@ -1017,16 +1020,16 @@ func (a AnsibleBroker) Unbind(
 	}
 
 	if token != "" {
-		return &UnbindResponse{Operation: token}, nil
+		return &osb.UnbindResponse{Operation: token}, nil
 	}
 
-	return &UnbindResponse{}, nil
+	return &osb.UnbindResponse{}, nil
 }
 
 // Update  - will update a service
 func (a AnsibleBroker) Update(
-	instanceUUID uuid.UUID, req *UpdateRequest, async bool, rawContext context.Context,
-) (*UpdateResponse, error) {
+	instanceUUID uuid.UUID, req *osb.UpdateRequest, async bool, rawContext context.Context,
+) (*osb.UpdateResponse, error) {
 	////////////////////////////////////////////////////////////
 	//type UpdateRequest struct {
 
@@ -1120,7 +1123,7 @@ func (a AnsibleBroker) Update(
 	}
 	if alreadyInProgress {
 		log.Infof("Update requested for instance %s, but job is already in progress", si.ID)
-		return &UpdateResponse{Operation: jobToken}, osb.ErrorUpdateInProgress
+		return &osb.UpdateResponse{Operation: jobToken}, osb.ErrorUpdateInProgress
 	}
 	////////////////////////////////////////////////////////////
 
@@ -1232,7 +1235,7 @@ func (a AnsibleBroker) Update(
 		}
 	}
 
-	return &UpdateResponse{Operation: token}, nil
+	return &osb.UpdateResponse{Operation: token}, nil
 }
 
 func (a AnsibleBroker) isValidPlanTransition(fromPlan *apb.Plan, toPlanName string) bool {
@@ -1267,8 +1270,8 @@ func (a AnsibleBroker) validateRequestedUpdateParams(
 }
 
 // LastOperation - gets the last operation and status
-func (a AnsibleBroker) LastOperation(instanceUUID uuid.UUID, req *LastOperationRequest,
-) (*LastOperationResponse, error) {
+func (a AnsibleBroker) LastOperation(instanceUUID uuid.UUID, req *osb.LastOperationRequest,
+) (*osb.LastOperationResponse, error) {
 	/*
 		look up the resource in etcd the operation should match what was returned by provision
 		take the status and return that.
@@ -1293,7 +1296,7 @@ func (a AnsibleBroker) LastOperation(instanceUUID uuid.UUID, req *LastOperationR
 	if jobstate.Error != "" {
 		log.Debugf("job state has an error. Assuming that any error here is human readable. err - %v", jobstate.Error)
 	}
-	return &LastOperationResponse{State: state, Description: jobstate.Error}, err
+	return &osb.LastOperationResponse{State: string(state), Description: jobstate.Error}, err
 }
 
 // AddSpec - adding the spec to the catalog for local development

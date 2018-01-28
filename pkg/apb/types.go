@@ -261,13 +261,12 @@ type ServiceInstance struct {
 	// All that's interesting about the APB version is the spec.
 	ID         uuid.UUID       `json:"id"`
 	Spec       *Spec           `json:"spec"`
-	Context    *osb.Context        `json:"context"`
-	Parameters *osb.Parameters     `json:"parameters"`
+	Context    *Context        `json:"context"`
+	Parameters *Parameters     `json:"parameters"`
 	BindingIDs map[string]bool `json:"binding_ids"`
 }
 
 func (apbInstance *ServiceInstance) OsbTransform() (*osb.ServiceInstance) {
-	// This is obnoxious, but I'm not sure how else to deal with it.
 	p := *apbInstance.Parameters
 	var planID uuid.UUID
 	if p != nil {
@@ -278,13 +277,40 @@ func (apbInstance *ServiceInstance) OsbTransform() (*osb.ServiceInstance) {
 		}
 	}
 
+	context := osb.Context{
+		Platform: apbInstance.Context.Platform,
+		Namespace: apbInstance.Context.Namespace,
+	}
+
+	// This is obnoxious, can this just get cast?
+	params := make(osb.Parameters)
+	for k, v := range *apbInstance.Parameters {
+		params[k] = v
+	}
+
 	return &osb.ServiceInstance{
 		ID: apbInstance.ID,
 		PlanID: planID,
-		Context: apbInstance.Context,
-		Parameters: apbInstance.Parameters,
+		Context: &context,
+		Parameters: &params,
 		BindingIDs: apbInstance.BindingIDs,
 	}
+}
+
+func ContextFromOsb(con *osb.Context) *Context {
+	return &Context{
+		Platform: con.Platform,
+		Namespace: con.Namespace,
+	}
+}
+
+func ParamFromOsb(p osb.Parameters) Parameters {
+	// This is obnoxious, can this just get cast?
+	params := make(Parameters)
+	for k, v := range p {
+		params[k] = v
+	}
+	return params
 }
 
 // AddBinding - Add binding ID to service instance
@@ -307,6 +333,31 @@ type BindInstance struct {
 	ID         uuid.UUID   `json:"id"`
 	ServiceID  uuid.UUID   `json:"service_id"`
 	Parameters *Parameters `json:"parameters"`
+}
+
+func BindInstanceFromOsb(b *osb.BindInstance) *BindInstance {
+	params := make(Parameters)
+	for k, v := range *b.Parameters {
+		params[k] = v
+	}
+	return &BindInstance {
+		ID: b.ID,
+		ServiceID: b.ServiceID,
+		Parameters: &params,
+	}
+}
+
+func (apbInstance *BindInstance) OsbTransform() *osb.BindInstance {
+	// This is obnoxious, can this just get cast?
+	params := make(osb.Parameters)
+	for k, v := range *apbInstance.Parameters {
+		params[k] = v
+	}
+	return &osb.BindInstance{
+		ID: apbInstance.ID,
+		ServiceID: apbInstance.ServiceID,
+		Parameters: &params,
+	}
 }
 
 // LoadJSON - Generic function to unmarshal json

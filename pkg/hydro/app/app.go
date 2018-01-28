@@ -18,26 +18,27 @@ package app
 
 import (
 	"github.com/gorilla/handlers"
-	"github.com/openshift/ansible-service-broker/pkg/hydro/log"
 	"github.com/openshift/ansible-service-broker/pkg/hydro/osb"
 	"github.com/openshift/ansible-service-broker/pkg/hydro/server"
 	"os"
 )
 
+type HydroBroker interface {
+	osb.OpenServiceBroker
+	Initialize() error
+}
+
 type App struct {
-	broker osb.OpenServiceBroker
+	broker HydroBroker
 	server server.Server
-	config Config
 }
 
-type Config struct {
-	LogConfig     log.LogConfig
-	HandlerConfig server.HandlerConfig
+func NewApp(broker HydroBroker) App {
+	return App{broker, server.NewDefaultServer()}
 }
 
-func NewApp(broker osb.OpenServiceBroker, config Config) App {
-	log.InitializeLog(config.LogConfig)
-	return App{broker, server.NewDefaultServer(), config}
+func NewAppWithServer(broker HydroBroker, server server.Server) App {
+	return App{broker, server}
 }
 
 func (a *App) SetServer(server server.Server) {
@@ -45,9 +46,12 @@ func (a *App) SetServer(server server.Server) {
 }
 
 func (a *App) Start() {
-	router := server.NewOpenServiceBrokerHandler(a.broker, a.config.HandlerConfig)
+	a.broker.Initialize()
+
+	router := server.NewOpenServiceBrokerHandler(
+		a.broker, server.HandlerConfig{true, a.server.Prefix()})
 	if srv, ok := a.server.(server.RouterExtender); ok {
-		srv.ExtendRouter(router)
+		srv.ExtendRouter(a.broker, router)
 	}
 	handler := handlers.LoggingHandler(os.Stdout, router)
 	a.server.StartServer(&handler)
