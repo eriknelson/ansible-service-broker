@@ -25,6 +25,7 @@ import (
 
 	schema "github.com/lestrrat/go-jsschema"
 	"github.com/openshift/ansible-service-broker/pkg/apb"
+	"github.com/openshift/ansible-service-broker/pkg/hydro/osb"
 )
 
 type formItem struct {
@@ -36,12 +37,12 @@ type formItem struct {
 
 // SpecToService converts an apb Spec into a Service usable by the service
 // catalog.
-func SpecToService(spec *apb.Spec) (Service, error) {
+func SpecToService(spec *apb.Spec) (osb.Service, error) {
 	plans, err := toBrokerPlans(spec.Plans)
 	if err != nil {
-		return Service{}, err
+		return osb.Service{}, err
 	}
-	retSvc := Service{
+	retSvc := osb.Service{
 		ID:            spec.ID,
 		Name:          spec.FQName,
 		Description:   spec.Description,
@@ -56,15 +57,15 @@ func SpecToService(spec *apb.Spec) (Service, error) {
 	return retSvc, nil
 }
 
-func toBrokerPlans(apbPlans []apb.Plan) ([]Plan, error) {
-	brokerPlans := make([]Plan, len(apbPlans))
+func toBrokerPlans(apbPlans []apb.Plan) ([]osb.Plan, error) {
+	brokerPlans := make([]osb.Plan, len(apbPlans))
 	i := 0
 	for _, plan := range apbPlans {
 		schemas, err := parametersToSchema(plan)
 		if err != nil {
 			return nil, err
 		}
-		brokerPlans[i] = Plan{
+		brokerPlans[i] = osb.Plan{
 			ID:          plan.ID,
 			Name:        plan.Name,
 			Description: plan.Description,
@@ -216,29 +217,29 @@ func getType(paramType string) (schema.PrimitiveTypes, error) {
 	return nil, fmt.Errorf("Could not find the parameter type for: %v", paramType)
 }
 
-func parametersToSchema(plan apb.Plan) (Schema, error) {
+func parametersToSchema(plan apb.Plan) (osb.Schema, error) {
 	// parametersToSchema converts the apb parameters into a JSON Schema format.
 	createProperties, err := extractProperties(plan.Parameters)
 	if err != nil {
-		return Schema{}, err
+		return osb.Schema{}, err
 	}
 	createRequired := extractRequired(plan.Parameters)
 
 	bindProperties, err := extractProperties(plan.BindParameters)
 	if err != nil {
-		return Schema{}, err
+		return osb.Schema{}, err
 	}
 	bindRequired := extractRequired(plan.BindParameters)
 
 	updatableProperties, err := extractUpdatable(plan.Parameters)
 	if err != nil {
-		return Schema{}, err
+		return osb.Schema{}, err
 	}
 	updatableRequired := extractUpdatableRequired(createRequired, updatableProperties)
 
 	// builds a Schema object for the various methods.
-	s := Schema{
-		ServiceInstance: ServiceInstance{
+	s := osb.Schema{
+		ServiceInstance: osb.ServiceInstanceSchema{
 			Create: map[string]*schema.Schema{
 				"parameters": {
 					SchemaRef:  schema.SchemaURL,
@@ -256,7 +257,7 @@ func parametersToSchema(plan apb.Plan) (Schema, error) {
 				},
 			},
 		},
-		ServiceBinding: ServiceBinding{
+		ServiceBinding: osb.ServiceBindingSchema{
 			Create: map[string]*schema.Schema{
 				"parameters": {
 					SchemaRef:  schema.SchemaURL,

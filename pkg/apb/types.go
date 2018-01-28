@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/ansible-service-broker/pkg/config"
 	logutil "github.com/openshift/ansible-service-broker/pkg/util/logging"
 	"github.com/pborman/uuid"
+	"github.com/openshift/ansible-service-broker/pkg/hydro/osb"
 )
 
 var log = logutil.NewLog()
@@ -180,6 +181,12 @@ func InitializeClusterConfig(config *config.Config) {
 }
 
 const (
+	// PlanParameterKey - key used to pass plan_id to APBs.
+	PlanParameterKey  = "_apb_plan_id"
+	// ServiceClassIDKey - key used to pass service_class_id to APBs.
+	ServiceClassIDKey = "_apb_service_class_id"
+	// ServiceInstIDKey - key used to pass service_instance_id to APBs.
+	ServiceInstIDKey  = "_apb_service_instance_id"
 	// StateInProgress - In progress job state
 	StateInProgress State = "in progress"
 	// StateSucceeded - Succeeded job state
@@ -250,11 +257,34 @@ func NewSpecManifest(specs []*Spec) SpecManifest {
 
 // ServiceInstance - Service Instance describes a running service.
 type ServiceInstance struct {
+	// NOTE: This thing should really just turn into a wrapper around the osb variant
+	// All that's interesting about the APB version is the spec.
 	ID         uuid.UUID       `json:"id"`
 	Spec       *Spec           `json:"spec"`
-	Context    *Context        `json:"context"`
-	Parameters *Parameters     `json:"parameters"`
+	Context    *osb.Context        `json:"context"`
+	Parameters *osb.Parameters     `json:"parameters"`
 	BindingIDs map[string]bool `json:"binding_ids"`
+}
+
+func (apbInstance *ServiceInstance) OsbTransform() (*osb.ServiceInstance) {
+	// This is obnoxious, but I'm not sure how else to deal with it.
+	p := *apbInstance.Parameters
+	var planID uuid.UUID
+	if p != nil {
+		if planId, ok := p[PlanParameterKey]; ok {
+			if planIdStr, ok := planId.(string); ok {
+				planId = uuid.Parse(planIdStr)
+			}
+		}
+	}
+
+	return &osb.ServiceInstance{
+		ID: apbInstance.ID,
+		PlanID: planID,
+		Context: apbInstance.Context,
+		Parameters: apbInstance.Parameters,
+		BindingIDs: apbInstance.BindingIDs,
+	}
 }
 
 // AddBinding - Add binding ID to service instance
