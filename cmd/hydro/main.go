@@ -24,7 +24,7 @@ import (
 
 func main() {
 	broker := asb.NewAnsibleBroker()
-	asbServer := server.NewAnsibleBrokerServer()
+	asbServer := server.NewAnsibleBrokerServer(broker)
 	app := hydro.NewAppWithServer(broker, asbServer)
 	app.Start()
 	//app := hydro.NewApp(broker.NewAnsibleBroker(), hydro.Config{

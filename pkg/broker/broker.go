@@ -93,6 +93,11 @@ func NewAnsibleBroker() (*AnsibleBroker) {
 	return &AnsibleBroker{}
 }
 
+// IsDevelopmentBroker - Reports if the broker has been configured in development mode or not.
+func (a *AnsibleBroker) IsDevelopmentBroker() bool {
+	return a.brokerConfig.DevBroker
+}
+
 // GetServiceInstance - retrieve the service instance for a instanceID.
 func (a AnsibleBroker) GetServiceInstance(instanceUUID uuid.UUID) (*osb.ServiceInstance, error) {
 	instance, err := a.dao.GetServiceInstance(instanceUUID.String())

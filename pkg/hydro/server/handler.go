@@ -90,13 +90,6 @@ func NewOpenServiceBrokerHandler(broker osb.OpenServiceBroker, config HandlerCon
 	r.HandleFunc("/v2/service_instances/{instance_uuid}/service_bindings/{binding_uuid}/last_operation",
 		createVarHandler(h.lastoperation)).Methods("GET")
 
-	// TODO: Push to broker server router extension
-	//if brokerConfig.GetBool("broker.dev_broker") {
-	//	s.HandleFunc("/v2/apb", createVarHandler(h.apbAddSpec)).Methods("POST")
-	//	s.HandleFunc("/v2/apb/{spec_id}", createVarHandler(h.apbRemoveSpec)).Methods("DELETE")
-	//	s.HandleFunc("/v2/apb", createVarHandler(h.apbRemoveSpecs)).Methods("DELETE")
-	//}
-
 	return r
 }
 
