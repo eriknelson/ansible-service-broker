@@ -48,19 +48,11 @@ func (s *AnsibleBrokerServer) Prefix() string {
 	return s.prefix
 }
 
-func (s *AnsibleBrokerServer) ExtendRouter(broker osb.OpenServiceBroker, router *mux.Router) {
-	ansibleBroker, ok := broker.(asb.AnsibleBroker)
-
-	if !ok {
-		log.Debug("Could not cast the OSB to an Ansible Broker...")
-		log.Error("Something went wrong trying to extend the ansible broker server's router!")
-		// TODO: Panic? Return error? What does hydro expect from brokers that error out while extending
-		// the router?
-	}
+func (s *AnsibleBrokerServer) ExtendRouter(router *mux.Router) {
 
 	router.HandleFunc("/v2/bootstrap", createVarHandler(s.bootstrap)).Methods("POST")
 
-	if ansibleBroker.IsDevelopmentBroker() {
+	if s.broker.IsDevelopmentBroker() {
 		router.HandleFunc("/v2/apb",
 			createVarHandler(s.apbAddSpec)).Methods("POST")
 		router.HandleFunc("/v2/apb/{spec_id}",

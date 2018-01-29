@@ -51,7 +51,7 @@ func (a *App) Start() {
 	router := server.NewOpenServiceBrokerHandler(
 		a.broker, server.HandlerConfig{true, a.server.Prefix()})
 	if srv, ok := a.server.(server.RouterExtender); ok {
-		srv.ExtendRouter(a.broker, router)
+		srv.ExtendRouter(router)
 	}
 	handler := handlers.LoggingHandler(os.Stdout, router)
 	a.server.StartServer(&handler)

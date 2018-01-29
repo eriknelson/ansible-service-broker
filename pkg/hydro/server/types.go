@@ -19,7 +19,6 @@ package server
 import (
 	"github.com/gorilla/mux"
 	"net/http"
-	"github.com/openshift/ansible-service-broker/pkg/hydro/osb"
 )
 
 // Server - Type that hydro will use to start the http server
@@ -33,5 +32,5 @@ type Server interface {
 // RouterExtender - Servers can extend the OSB API with their own endpoints
 type RouterExtender interface {
 	// ExtendRouter - Implement on a server to extend the default router
-	ExtendRouter(osb.OpenServiceBroker, *mux.Router)
+	ExtendRouter(*mux.Router)
 }
