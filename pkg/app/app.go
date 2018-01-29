@@ -260,6 +260,7 @@ func CreateApp() App {
 		app.dao, app.registry, *app.engine, app.config.GetSubConfig("broker"),
 	); err != nil {
 		log.Error("Failed to create AnsibleBroker\n")
+		log.Error("Test signing")
 		log.Error(err.Error())
 		os.Exit(1)
 	}
