@@ -23,6 +23,9 @@ broker: $(SOURCES) ## Build the broker
 migration: $(SOURCES)
 	go build -i -ldflags="-s -w" ./cmd/migration
 
+dashboard-redirector: $(SOURCES)
+	go build -i -ldflags="-s -w" ./cmd/dashboard-redirector
+
 build: broker ## Build binary from source
 	@echo > /dev/null
 
