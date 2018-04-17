@@ -20,9 +20,10 @@ import (
 	//"encoding/json"
 	"flag"
 	"fmt"
-	"os"
+	"net/http"
+	//"os"
 
-	"github.com/automationbroker/bundle-lib/apb"
+	//"github.com/automationbroker/bundle-lib/apb"
 	crd "github.com/openshift/ansible-service-broker/pkg/dao/crd"
 
 	"github.com/sirupsen/logrus"
@@ -30,10 +31,12 @@ import (
 
 var options struct {
 	BrokerNamespace string
+	Port            int
 }
 
 func init() {
-	flag.StringVar(&options.BrokerNamespace, "namespace", "", "namespace that the broker resides in")
+	flag.IntVar(&options.Port, "port", 1337, "port that the dashboard-redirector should listen on")
+	flag.StringVar(&options.BrokerNamespace, "ansible-service-broker", "", "namespace that the broker resides in")
 	flag.Parse()
 }
 
@@ -50,25 +53,23 @@ func main() {
 		panic(fmt.Sprintf("Unable to create crd client - %v", err))
 	}
 
-	// convert all the service instances
-	siSaved := []*apb.ServiceInstance{}
+	http.HandleFunc("/", redirect)
+	portStr := fmt.Sprintf(":%d", options.Port)
 
-	//if siJSONStrs != nil {
-	//for _, str := range *siJSONStrs {
-	//si := apb.ServiceInstance{}
-	//err := json.Unmarshal([]byte(str), &si)
-	//if err != nil {
-	//revertServiceInstance(siSaved)
-	//revertCrdSavedSpecs(crdSavedSpecs)
-	//panic(fmt.Sprintf("Unable to migrate all the service instances json unmarshal error - %v", err))
-	//}
-	//err = crdDao.SetServiceInstance(si.ID.String(), &si)
-	//if err != nil {
-	//revertServiceInstance(siSaved)
-	//revertCrdSavedSpecs(crdSavedSpecs)
-	//panic(fmt.Sprintf("Unable to migrate all the service instances set service instance - %v", err))
-	//}
-	//siSaved = append(siSaved, &si)
-	//}
-	//}
+	logrus.Infof("Dashboard redirector listening on port [%s]", portStr)
+	err = http.ListenAndServe(portStr, nil)
+	if err != nil {
+		logrus.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func redirect(w http.ResponseWriter, r *http.Request) {
+	specs, err := crdDao.BatchGetSpecs("")
+	if err != nil {
+		logrus.Errorf("Something went wrong trying to batch get specs! %+v", err.Error())
+	} else {
+		logrus.Infof("Got specs! %+v", specs)
+	}
+
+	http.Redirect(w, r, "http://www.google.com", 301)
 }
