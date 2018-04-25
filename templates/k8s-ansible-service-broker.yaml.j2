@@ -74,7 +74,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: asb-auth-secret
-  namespace: ansible-service-broker
+  namespace: erik
 data:
   username: "{{ broker_user }}"
   password: "{{ broker_pass }}"
@@ -207,7 +207,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ansibleservicebroker-client
-  namespace: ansible-service-broker
+  namespace: erik
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -217,7 +217,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: ansibleservicebroker-client
-  namespace: ansible-service-broker
+  namespace: erik
 roleRef:
   kind: ClusterRole
   name: access-asb-role
@@ -228,6 +228,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: ansibleservicebroker-client
+  namespace: erik
   annotations:
     kubernetes.io/service-account.name: ansibleservicebroker-client
 type: kubernetes.io/service-account-token

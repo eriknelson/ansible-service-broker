@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BROKER_URL=${BROKER_URL:-"https://raw.githubusercontent.com/openshift/ansible-service-broker/master/"}
+BROKER_URL=${BROKER_URL:-"https://raw.githubusercontent.com/eriknelson/ansible-service-broker/ns-broker/"}
 TEMPLATE_URL="${BROKER_URL}/templates"
 
 curl ${TEMPLATE_URL}/k8s-template.py -o /tmp/k8s-template.py
@@ -15,13 +15,14 @@ function create-broker-resource {
     broker_ca_cert=$(cat /tmp/asb-cert/cert.pem | base64 -w 0)
     kubectl create secret tls asb-tls --cert="/tmp/asb-cert/cert.pem" --key="/tmp/asb-cert/key.pem" -n ansible-service-broker
     client_token=$(kubectl get sa ansibleservicebroker-client -o yaml | grep -w ansibleservicebroker-client-token | grep -o 'ansibleservicebroker-client-token.*$')
-    broker_auth='{ "bearer": { "secretRef": { "kind": "Secret", "namespace": "ansible-service-broker", "name": "REPLACE_TOKEN_STRING" } } }'
+    broker_auth='{ "bearer": { "secretRef": { "kind": "Secret", "namespace": "erik", "name": "REPLACE_TOKEN_STRING" } } }'
 
     cat <<EOF > "/tmp/broker-resource.yaml"
 apiVersion: servicecatalog.k8s.io/v1beta1
-kind: ClusterServiceBroker
+kind: ServiceBroker
 metadata:
-  name: ansible-service-broker
+  name: eriks-asb
+  namespace: erik
 spec:
   url: "https://asb.ansible-service-broker.svc:1338/ansible-service-broker/"
   authInfo:
@@ -30,7 +31,7 @@ spec:
 EOF
 
     sed -i 's/REPLACE_TOKEN_STRING/'"$client_token"'/g' /tmp/broker-resource.yaml
-    kubectl create -f /tmp/broker-resource.yaml -n ansible-service-broker
+    kubectl create -f /tmp/broker-resource.yaml -n erik
 }
 
 function ansible-service-broker {
@@ -47,12 +48,14 @@ function ansible-service-broker {
     kubectl create ns ansible-service-broker
 
     context=$(kubectl config current-context)
-    cluster=$(kubectl config get-contexts $context --no-headers | awk '{ print $3 }')
+    #cluster=$(kubectl config get-contexts $context --no-headers | awk '{ print $3 }')
 
-    kubectl config set-context $context --cluster=$cluster --namespace=ansible-service-broker
+    kubectl config set-context asb --cluster=dind --namespace=ansible-service-broker
+    kubectl config use-context asb
     kubectl create -f "/tmp/k8s-ansible-service-broker.yaml"
 
     create-broker-resource
+    kubectl config use-context $context
 }
 
 echo "========================================================================"
