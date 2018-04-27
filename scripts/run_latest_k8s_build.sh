@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BROKER_URL=${BROKER_URL:-"https://raw.githubusercontent.com/eriknelson/ansible-service-broker/ns-broker/"}
+BROKER_URL=${BROKER_URL:-"https://raw.githubusercontent.com/openshift/ansible-service-broker/master/"}
 TEMPLATE_URL="${BROKER_URL}/templates"
 
 curl ${TEMPLATE_URL}/k8s-template.py -o /tmp/k8s-template.py
@@ -15,14 +15,14 @@ function create-broker-resource {
     broker_ca_cert=$(cat /tmp/asb-cert/cert.pem | base64 -w 0)
     kubectl create secret tls asb-tls --cert="/tmp/asb-cert/cert.pem" --key="/tmp/asb-cert/key.pem" -n ansible-service-broker
     client_token=$(kubectl get sa ansibleservicebroker-client -o yaml | grep -w ansibleservicebroker-client-token | grep -o 'ansibleservicebroker-client-token.*$')
-    broker_auth='{ "bearer": { "secretRef": { "kind": "Secret", "namespace": "erik", "name": "REPLACE_TOKEN_STRING" } } }'
+    broker_auth='{ "bearer": { "secretRef": { "kind": "Secret", "namespace": "ansible-service-broker", "name": "REPLACE_TOKEN_STRING" } } }'
 
     cat <<EOF > "/tmp/broker-resource.yaml"
 apiVersion: servicecatalog.k8s.io/v1beta1
 kind: ServiceBroker
 metadata:
   name: eriks-asb
-  namespace: erik
+  namespace: ansible-service-broker
 spec:
   url: "https://asb.ansible-service-broker.svc:1338/ansible-service-broker/"
   authInfo:
@@ -31,7 +31,7 @@ spec:
 EOF
 
     sed -i 's/REPLACE_TOKEN_STRING/'"$client_token"'/g' /tmp/broker-resource.yaml
-    kubectl create -f /tmp/broker-resource.yaml -n erik
+    kubectl create -f /tmp/broker-resource.yaml -n ansible-service-broker
 }
 
 function ansible-service-broker {
