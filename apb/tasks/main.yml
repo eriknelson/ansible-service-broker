@@ -41,8 +41,8 @@
     definition: "{{ lookup('template', item.name) | from_yaml }}"
   loop:
     - name: broker.service.yaml
-    - name: broker.route.yaml
-      state: "{{ state if cluster == 'openshift' else 'absent' }}"
+    #- name: broker.route.yaml
+      #state: "{{ state if cluster == 'openshift' else 'absent' }}"
     - name: broker.serviceaccount.yaml
     - name: broker.clusterrolebinding.yaml
     - name: broker.configmap.yaml
@@ -63,13 +63,13 @@
     definition: "{{ lookup('template', item.name) | from_yaml }}"
   loop:
     - name: broker.deployment.yaml
-    - name: broker.servicecatalog.yaml
+    #- name: broker.servicecatalog.yaml
 
-- name: Wait for clusterservicebroker to become ready
-  debug:
-    msg: "Broker ready status: {{ cluster_service_broker_query }}"
-  vars:
-  retries: 60
-  delay: 10
-  until: cluster_service_broker_query | length > 0 and cluster_service_broker_query | first == "True"
-  when: apb_action == 'provision' and wait_for_broker
+#- name: Wait for clusterservicebroker to become ready
+  #debug:
+    #msg: "Broker ready status: {{ cluster_service_broker_query }}"
+  #vars:
+  #retries: 60
+  #delay: 10
+  #until: cluster_service_broker_query | length > 0 and cluster_service_broker_query | first == "True"
+  #when: apb_action == 'provision' and wait_for_broker

@@ -97,7 +97,7 @@ clean: ## Clean up your working environment
 really-clean: clean cleanup-ci ## Really clean up the working environment
 	@rm -f $(KUBERNETES_FILES)
 
-deploy: build-image build-apb ## Deploy a built broker docker image to a running cluster
+deploy: ## Deploy a built broker docker image to a running cluster
 	APB_IMAGE=${APB_IMAGE} BROKER_IMAGE=${BROKER_IMAGE} ACTION="provision" ./scripts/deploy.sh
 
 undeploy: ## Uninstall a deployed broker from a running cluster
