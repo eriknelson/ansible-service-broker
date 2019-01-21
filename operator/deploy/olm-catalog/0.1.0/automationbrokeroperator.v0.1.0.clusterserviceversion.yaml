@@ -66,7 +66,6 @@ spec:
           - pods
           - configmaps
           - secrets
-          - serviceaccounts
           - services
           verbs:
           - "*"
@@ -88,114 +87,17 @@ spec:
           - deploymentconfigs
           verbs:
           - "*"
-      - serviceAccountName: automation-broker
-        rules:
-        - apiGroups:
-          - ""
-          resources:
-          - configmaps
-          verbs:
-          - get
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - secrets
-          verbs:
-          - create
-          - delete
-          - get
-        - apiGroups:
-          - automationbroker.io
-          resources:
-          - bundles
-          - bundleinstances
-          - bundlebindings
-          verbs:
-          - "*"
       clusterPermissions:
       - serviceAccountName: automation-broker-operator
         rules:
         - apiGroups:
-          - servicecatalog.k8s.io
-          resources:
-          - clusterservicebrokers
-          - servicebrokers
-          verbs:
-          - "*"
-        # Must be cluster scoped, since we're expecting a single operator
-        # to be installed into a designated namespace, watching the full
-        # cluster for CRs.
-        - apiGroups:
-          - automationbroker.io
-          resources:
-          - "*"
-          verbs:
-          - "*"
-        ################################################################################
-        # This may be required to allow the operator to create an aggregated ClusterRole
-        # in order to add the rule that is checked by the broker to edit and/or admin.
-        ################################################################################
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterroles
-          verbs:
-          - create
-          - patch
-        ################################################################################
-        #
-        ################################################################################
-        # Questionable, could maybe pull these?
-        ################################################################################
-        #- nonResourceURLs:
-        #  - /version/openshift
-        #  verbs:
-        #  - get
-        ##Could maybe try this one with just get?
-        #- apiGroups:
-        #  - apiextensions.k8s.io
-        #  resources:
-        #  - customresourcedefinitions
-        #  verbs:
-        #  - get
-        #  - patch
-        #  - update
-        # OLM should be able to handle these instead of the operator's ansible
-        #- apiGroups:
-        #  - rbac.authorization.k8s.io
-        #  resources:
-        #  - clusterrolebindings
-        #  - clusterroles
-        #  verbs:
-        #  - get
-        #  - patch
-        #  - update
-      - serviceAccountName: automation-broker
-        rules:
-        - apiGroups:
-          - ""
-          resources:
-          - namespaces
-          verbs:
-          - get
-          - create
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - create
-          - get
-          - list
-          - watch
-        - apiGroups:
           - ""
           resources:
           - serviceaccounts
+          - namespaces
+          - pods
           verbs:
-          - create
+          - "*"
         - apiGroups:
           - authentication.k8s.io
           resources:
@@ -211,12 +113,20 @@ spec:
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
+          - clusterroles
+          - clusterrolebindings
           - rolebindings
           verbs:
           - create
           - delete
-        # broker must be able to set up a networkpolicy in the target
-        # namespace to set up a tunnel between the sandbox and the target
+          - patch
+        - apiGroups:
+          - servicecatalog.k8s.io
+          resources:
+          - clusterservicebrokers
+          - servicebrokers
+          verbs:
+          - "*"
         - apiGroups:
           - networking.k8s.io
           resources:
@@ -225,11 +135,14 @@ spec:
           - create
           - delete
         - apiGroups:
-          - authorization.openshift.io
+          - network.openshift.io
+          - ""
           resources:
-          - subjectrulesreview
+          - clusternetworks
+          - netnamespaces
           verbs:
-          - create
+          - get
+          - update
         - apiGroups:
           - image.openshift.io
           - ""
@@ -239,22 +152,11 @@ spec:
           - get
           - list
         - apiGroups:
-          - network.openshift.io
-          - ""
+          - automationbroker.io
           resources:
-          - clusternetworks
-          - netnamespaces
+          - "*"
           verbs:
-          - get
-        - apiGroups:
-          - network.openshift.io
-          - ""
-          resources:
-          - netnamespaces
-          verbs:
-          - update
-      - serviceAccountName: automation-broker-client
-        rules:
+          - "*"
         - nonResourceURLs:
           - "/osb"
           - "/osb/*"

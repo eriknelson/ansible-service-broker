@@ -21,7 +21,7 @@
     - name: Write broker-config into CR
       k8s:
         state: "{{ state }}"
-        definition: "{{ lookup('template', 'broker.ansibleservicebroker.yaml.j2' ) | from_yaml }}"
+        definition: "{{ lookup('template', 'broker.automationbroker.yaml.j2' ) | from_yaml }}"
 
     - name: Exit if broker_config not defined
       meta: end_play

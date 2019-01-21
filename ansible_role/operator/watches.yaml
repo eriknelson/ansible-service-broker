@@ -5,6 +5,7 @@
   group: automationbroker.io
   kind: AutomationBroker
   playbook: /opt/ansible/deploy.yml
+  watchDependentResources: false
   finalizer:
     name: finalizer.automationbroker.io
     vars:
