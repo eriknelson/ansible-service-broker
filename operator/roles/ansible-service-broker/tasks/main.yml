@@ -42,13 +42,13 @@
     - value: broker.clusterrole.yaml.j2
     - value: broker.clusterrolebinding.yaml.j2
     - value: broker.service.yaml.j2
+    - value: broker.deployment.yaml.j2
     - value: broker.route.yaml.j2
       condition: "{{ 'route.openshift.io' in api_groups }}"
-    - value: broker.deployment.yaml.j2
-    - value: broker.servicecatalog.yaml.j2
-      condition: "{{ 'servicecatalog.k8s.io' in api_groups }}"
     - value: broker-client.serviceaccount.yaml.j2
     - value: broker-client.clusterrole.yaml.j2
     - value: broker-client.clusterrolebinding.yaml.j2
     - value: broker-client.secret.yaml.j2
     - value: broker-service-ca-bundle.configmap.yaml.j2
+    - value: broker.servicecatalog.yaml.j2
+      condition: "{{ 'servicecatalog.k8s.io' in api_groups }}"
