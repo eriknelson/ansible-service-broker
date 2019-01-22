@@ -13,18 +13,18 @@
   import_tasks: tls_k8s.yml
   when: "'route.openshift.io' not in api_groups"
 
-- name: Dashboard redirector
-  when: "'route.openshift.io' in api_groups"
-  block:
-    - name: Set dashboard redirector state={{ state }}
-      k8s:
-        state: "{{ state }}"
-        definition: "{{ lookup('template', 'broker-redirector.route.yaml.j2') | from_yaml }}"
+#- name: Dashboard redirector
+  #when: "'route.openshift.io' in api_groups"
+  #block:
+    #- name: Set dashboard redirector state={{ state }}
+      #k8s:
+        #state: "{{ state }}"
+        #definition: "{{ lookup('template', 'broker-redirector.route.yaml.j2') | from_yaml }}"
 
-    - name: Add redirector to broker config object
-      when: state == "present"
-      set_fact:
-        broker: "{{ broker_config.broker | combine({'dashboard_redirector': dashboard_redirector_url}) }}"
+    #- name: Add redirector to broker config object
+      #when: state == "present"
+      #set_fact:
+        #broker: "{{ broker_config.broker | combine({'dashboard_redirector': dashboard_redirector_url}) }}"
 
 - name: ConfigMap for Broker
   k8s:
