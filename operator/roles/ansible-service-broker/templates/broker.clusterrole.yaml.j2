@@ -54,6 +54,8 @@ rules:
   verbs:
   - create
   - delete
+  - list
+  - get
 - apiGroups:
   - authorization.openshift.io
   resources:
@@ -76,6 +78,8 @@ rules:
   - netnamespaces
   verbs:
   - get
+  - update
+  - list
 - apiGroups:
   - network.openshift.io
   - ""
@@ -83,3 +87,9 @@ rules:
   - netnamespaces
   verbs:
   - update
+- apiGroups:
+  - automationbroker.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
